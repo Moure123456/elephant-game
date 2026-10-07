@@ -7,65 +7,70 @@ let gameFrame = 0;
 
 // الفيل
 const elephant = {
-    x: 80,
-    y: 280,
-    width: 65,
+    x: 60,
+    y: 270,
+    width: 60,
     height: 50,
     dy: 0,
     gravity: 0.6,
-    jumpPower: -13,
+    jumpPower: -12,
     isGrounded: false,
     legAngle: 0
 };
 
 // الأشجار في الخلفية
 const trees = [
-    { x: 100, width: 40, height: 100 },
-    { x: 300, width: 60, height: 130 },
-    { x: 550, width: 45, height: 110 },
-    { x: 750, width: 50, height: 120 }
+    { x: 100, width: 40, height: 90 },
+    { x: 300, width: 50, height: 120 },
+    { x: 550, width: 45, height: 100 },
+    { x: 750, width: 50, height: 110 }
 ];
 
-// العوائق (صخور / شجيرات)
+// العوائق
 const obstacles = [];
 let obstacleTimer = 0;
 
 function createObstacle() {
     obstacles.push({
         x: canvas.width,
-        y: 310,
-        width: 35,
+        y: 305,
+        width: 30,
         height: 35,
-        speed: 6
+        speed: 5
     });
 }
 
-// التحكم
+// التحكم عبر اللمس (للهواتف)
+canvas.addEventListener("touchstart", handleAction);
+document.addEventListener("touchstart", handleAction);
+
+// التحكم عبر لوحة المفاتيح
 document.addEventListener("keydown", (e) => {
-    if (e.code === "Space" && elephant.isGrounded && !gameOver) {
-        elephant.dy = elephant.jumpPower;
-        elephant.isGrounded = false;
-    } else if (e.code === "Space" && gameOver) {
-        resetGame();
+    if (e.code === "Space") {
+        handleAction(e);
     }
 });
 
-document.addEventListener("touchstart", () => {
+function handleAction(e) {
+    if (e && e.type === "keydown") {
+        e.preventDefault();
+    }
     if (elephant.isGrounded && !gameOver) {
         elephant.dy = elephant.jumpPower;
         elephant.isGrounded = false;
     } else if (gameOver) {
         resetGame();
     }
-});
+}
 
 function resetGame() {
     score = 0;
     gameOver = false;
     obstacles.length = 0;
-    elephant.y = 280;
+    elephant.y = 270;
     elephant.dy = 0;
     gameFrame = 0;
+    obstacleTimer = 0;
     requestAnimationFrame(update);
 }
 
@@ -74,7 +79,7 @@ function update() {
 
     gameFrame++;
 
-    // حركة الفيل للقفز
+    // حركة الفيل والقفز
     elephant.dy += elephant.gravity;
     elephant.y += elephant.dy;
 
@@ -84,24 +89,24 @@ function update() {
         elephant.isGrounded = true;
     }
 
-    // انيميشن الأرجل أثناء الجري
+    // انيميشن الأرجل
     if (elephant.isGrounded) {
-        elephant.legAngle = Math.sin(gameFrame * 0.2) * 12;
+        elephant.legAngle = Math.sin(gameFrame * 0.2) * 10;
     } else {
         elephant.legAngle = 5;
     }
 
-    // تحريك الأشجار للخلفية
+    // تحريك الأشجار
     trees.forEach(tree => {
         tree.x -= 2;
         if (tree.x + tree.width < 0) {
-            tree.x = canvas.width + Math.random() * 100;
+            tree.x = canvas.width + Math.random() * 50;
         }
     });
 
     // توليد العوائق
     obstacleTimer++;
-    if (obstacleTimer > 90) {
+    if (obstacleTimer > 100) {
         createObstacle();
         obstacleTimer = 0;
     }
@@ -111,7 +116,7 @@ function update() {
         const obs = obstacles[i];
         obs.x -= obs.speed;
 
-        // تصادم
+        // كشف التصادم
         if (
             elephant.x < obs.x + obs.width - 5 &&
             elephant.x + elephant.width - 5 > obs.x &&
@@ -121,7 +126,7 @@ function update() {
             gameOver = true;
         }
 
-        // زيادة النقاط
+        // زيادة النقاط عند تجاور العائق
         if (obs.x + obs.width < 0) {
             obstacles.splice(i, 1);
             score += 10;
@@ -137,60 +142,51 @@ function update() {
     }
 }
 
-// رسم الفيل تفصيلي بالـ Canvas
+// رسم الفيل
 function drawElephant(x, y) {
     ctx.save();
     ctx.translate(x, y);
 
     // الأرجل الخلفية
-    ctx.fillStyle = "#808b96";
-    ctx.fillRect(10 - elephant.legAngle/2, 35, 10, 18);
-    ctx.fillRect(40 + elephant.legAngle/2, 35, 10, 18);
+    ctx.fillStyle = "#7f8c8d";
+    ctx.fillRect(10 - elephant.legAngle / 2, 32, 10, 18);
+    ctx.fillRect(38 + elephant.legAngle / 2, 32, 10, 18);
 
     // جسم الفيل
-    ctx.fillStyle = "#a6acaf";
+    ctx.fillStyle = "#95a5a6";
     ctx.beginPath();
-    ctx.ellipse(30, 25, 30, 22, 0, 0, Math.PI * 2);
+    ctx.arc(28, 22, 22, 0, Math.PI * 2);
     ctx.fill();
 
     // الأرجل الأمامية
-    ctx.fillStyle = "#a6acaf";
-    ctx.fillRect(10 + elephant.legAngle, 35, 10, 18);
-    ctx.fillRect(40 - elephant.legAngle, 35, 10, 18);
+    ctx.fillStyle = "#95a5a6";
+    ctx.fillRect(10 + elephant.legAngle, 32, 10, 18);
+    ctx.fillRect(38 - elephant.legAngle, 32, 10, 18);
 
     // الرأس
     ctx.beginPath();
-    ctx.arc(52, 18, 15, 0, Math.PI * 2);
+    ctx.arc(48, 16, 14, 0, Math.PI * 2);
     ctx.fill();
 
     // الأذن
-    ctx.fillStyle = "#808b96";
+    ctx.fillStyle = "#7f8c8d";
     ctx.beginPath();
-    ctx.ellipse(45, 18, 10, 14, 0.2, 0, Math.PI * 2);
+    ctx.arc(40, 16, 9, 0, Math.PI * 2);
     ctx.fill();
 
     // العين
     ctx.fillStyle = "#000";
     ctx.beginPath();
-    ctx.arc(56, 14, 2.5, 0, Math.PI * 2);
+    ctx.arc(52, 12, 2, 0, Math.PI * 2);
     ctx.fill();
 
-    // الخرطوم (متحرك عند القفز)
-    ctx.strokeStyle = "#a6acaf";
-    ctx.lineWidth = 6;
-    ctx.lineCap = "round";
+    // الخرطوم
+    ctx.strokeStyle = "#95a5a6";
+    ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.moveTo(63, 20);
-    const trunkCurl = elephant.isGrounded ? Math.sin(gameFrame * 0.1) * 5 : -10;
-    ctx.quadraticCurveTo(75, 25, 70 + trunkCurl, 38);
-    ctx.stroke();
-
-    // الناب
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(60, 24);
-    ctx.quadraticCurveTo(66, 26, 68, 20);
+    ctx.moveTo(58, 18);
+    const trunkMove = elephant.isGrounded ? Math.sin(gameFrame * 0.1) * 4 : -8;
+    ctx.lineTo(68, 25 + trunkMove);
     ctx.stroke();
 
     ctx.restore();
@@ -198,27 +194,55 @@ function drawElephant(x, y) {
 
 // رسم شجرة
 function drawTree(tree) {
-    // الجذع
-    ctx.fillStyle = "#5d4037";
-    ctx.fillRect(tree.x + tree.width / 2 - 8, canvas.height - 70 - tree.height, 16, tree.height);
+    ctx.fillStyle = "#795548";
+    ctx.fillRect(tree.x + tree.width / 2 - 6, 330 - tree.height, 12, tree.height);
 
-    // أوراق الشجرة
     ctx.fillStyle = "#2e7d32";
     ctx.beginPath();
-    ctx.arc(tree.x + tree.width / 2, canvas.height - 70 - tree.height, tree.width / 1.2, 0, Math.PI * 2);
+    ctx.arc(tree.x + tree.width / 2, 330 - tree.height, tree.width / 1.1, 0, Math.PI * 2);
     ctx.fill();
 }
 
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // السماء والغيوم
+    // خلفية السماء
     ctx.fillStyle = "#87ceeb";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // رسم الأشجار في الخلفية
+    // رسم الأشجار
     trees.forEach(drawTree);
 
-    // الأرض
+    // رسم الأرض
     ctx.fillStyle = "#4caf50";
-    ctx.fillRect(0, 
+    ctx.fillRect(0, 330, canvas.width, 70);
+    ctx.fillStyle = "#388e3c";
+    ctx.fillRect(0, 330, canvas.width, 6);
+
+    // رسم الفيل
+    drawElephant(elephant.x, elephant.y);
+
+    // رسم العوائق (صخور)
+    ctx.fillStyle = "#6d4c41";
+    obstacles.forEach(obs => {
+        ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+    });
+
+    // النتيجة
+    ctx.fillStyle = "#000000";
+    ctx.font = "bold 20px Arial";
+    ctx.fillText("النتيجة: " + score, 20, 30);
+}
+
+function showGameOver() {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#FFF";
+    ctx.font = "bold 28px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2 - 10);
+    ctx.font = "18px Arial";
+    ctx.fillText("إلمس الشاشة لإعادة اللعب", canvas.width / 2, canvas.height / 2 + 30);
+}
+
+// البدء
+update();
