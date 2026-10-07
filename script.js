@@ -18,7 +18,7 @@ const elephant = {
     legAngle: 0
 };
 
-// الأشجار في الخلفية
+// الأشجار
 const trees = [
     { x: 100, width: 40, height: 90 },
     { x: 300, width: 50, height: 120 },
@@ -40,21 +40,7 @@ function createObstacle() {
     });
 }
 
-// التحكم عبر اللمس (للهواتف)
-canvas.addEventListener("touchstart", handleAction);
-document.addEventListener("touchstart", handleAction);
-
-// التحكم عبر لوحة المفاتيح
-document.addEventListener("keydown", (e) => {
-    if (e.code === "Space") {
-        handleAction(e);
-    }
-});
-
-function handleAction(e) {
-    if (e && e.type === "keydown") {
-        e.preventDefault();
-    }
+function handleAction() {
     if (elephant.isGrounded && !gameOver) {
         elephant.dy = elephant.jumpPower;
         elephant.isGrounded = false;
@@ -62,6 +48,14 @@ function handleAction(e) {
         resetGame();
     }
 }
+
+// التحكم
+window.addEventListener("touchstart", handleAction);
+window.addEventListener("keydown", function(e) {
+    if (e.code === "Space") {
+        handleAction();
+    }
+});
 
 function resetGame() {
     score = 0;
@@ -79,7 +73,7 @@ function update() {
 
     gameFrame++;
 
-    // حركة الفيل والقفز
+    // الحركة والفيزياء
     elephant.dy += elephant.gravity;
     elephant.y += elephant.dy;
 
@@ -89,7 +83,7 @@ function update() {
         elephant.isGrounded = true;
     }
 
-    // انيميشن الأرجل
+    // حركة الأرجل
     if (elephant.isGrounded) {
         elephant.legAngle = Math.sin(gameFrame * 0.2) * 10;
     } else {
@@ -97,7 +91,7 @@ function update() {
     }
 
     // تحريك الأشجار
-    trees.forEach(tree => {
+    trees.forEach(function(tree) {
         tree.x -= 2;
         if (tree.x + tree.width < 0) {
             tree.x = canvas.width + Math.random() * 50;
@@ -116,7 +110,6 @@ function update() {
         const obs = obstacles[i];
         obs.x -= obs.speed;
 
-        // كشف التصادم
         if (
             elephant.x < obs.x + obs.width - 5 &&
             elephant.x + elephant.width - 5 > obs.x &&
@@ -126,7 +119,6 @@ function update() {
             gameOver = true;
         }
 
-        // زيادة النقاط عند تجاور العائق
         if (obs.x + obs.width < 0) {
             obstacles.splice(i, 1);
             score += 10;
@@ -192,7 +184,7 @@ function drawElephant(x, y) {
     ctx.restore();
 }
 
-// رسم شجرة
+// رسم الشجرة
 function drawTree(tree) {
     ctx.fillStyle = "#795548";
     ctx.fillRect(tree.x + tree.width / 2 - 6, 330 - tree.height, 12, tree.height);
@@ -204,25 +196,25 @@ function drawTree(tree) {
 }
 
 function draw() {
-    // خلفية السماء
+    // السماء
     ctx.fillStyle = "#87ceeb";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // رسم الأشجار
+    // الأشجار
     trees.forEach(drawTree);
 
-    // رسم الأرض
+    // الأرض
     ctx.fillStyle = "#4caf50";
     ctx.fillRect(0, 330, canvas.width, 70);
     ctx.fillStyle = "#388e3c";
     ctx.fillRect(0, 330, canvas.width, 6);
 
-    // رسم الفيل
+    // الفيل
     drawElephant(elephant.x, elephant.y);
 
-    // رسم العوائق (صخور)
+    // العوائق
     ctx.fillStyle = "#6d4c41";
-    obstacles.forEach(obs => {
+    obstacles.forEach(function(obs) {
         ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
     });
 
@@ -244,5 +236,5 @@ function showGameOver() {
     ctx.fillText("إلمس الشاشة لإعادة اللعب", canvas.width / 2, canvas.height / 2 + 30);
 }
 
-// البدء
+// بدء التشغيل
 update();
