@@ -5,13 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Elephant Pi Adventure 3D</title>
     
-    <!-- مكتبة Pi SDK الرسمية المعتمدة من App Studio -->
+    <!-- مكتبة Pi SDK الرسمية -->
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
     <script>
-        // تهيئة Pi SDK لتأكيد التوثيق لدى App Studio
-        if (window.Pi) {
-            window.Pi.init({ version: "2.0", sandbox: true });
-        }
+        // تهيئة وتأكيد التوثيق الخاص بـ App Studio (Pi Auth)
+        window.onload = function() {
+            if (window.Pi) {
+                try {
+                    window.Pi.init({ version: "2.0", sandbox: true });
+                    // دالة التوثيق التي تفحصها App Studio
+                    window.Pi.authenticate(['username', 'payments', 'wallet_address'], onIncompletePaymentFound)
+                    .then(function(auth) {
+                        console.log("Pi App Verified Successfully:", auth);
+                    }).catch(function(error) {
+                        console.error("Pi Auth Error:", error);
+                    });
+                } catch(e) {
+                    console.log("Pi SDK Init Error:", e);
+                }
+            }
+        };
+
+        function onIncompletePaymentFound(payment) {
+            console.log("Incomplete payment found:", payment);
+        };
     </script>
 
     <style>
