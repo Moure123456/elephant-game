@@ -3,14 +3,13 @@ if (window.Pi) {
     try {
         window.Pi.init({ version: "2.0", sandbox: true });
     } catch(e) {
-        console.log("Pi SDK Initialization:", e);
+        console.log("Pi SDK Init:", e);
     }
 }
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// ضبط أبعاد اللعبة للأفقية
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -22,44 +21,48 @@ let score = 0;
 let piCoins = 0;
 let gameOver = false;
 let gameFrame = 0;
+let passedObstaclesCount = 0; // حساب الحواجز المتجاوزة
 
 // مستويات القفز الثلاثة
 const JUMP_LEVELS = [
     { level: 1, power: -11 },
-    { level: 2, power: -15 },
-    { level: 3, power: -18 }
+    { level: 2, power: -14.5 },
+    { level: 3, power: -17.5 }
 ];
 let currentJumpLevel = 0;
 
 // الفيل
 const elephant = {
-    x: 100,
+    x: 80,
     y: 0,
-    width: 70,
-    height: 55,
+    width: 65,
+    height: 50,
     speedX: 0,
-    maxSpeed: 8,
+    maxSpeed: 7,
     dy: 0,
-    gravity: 0.65,
+    gravity: 0.6,
     isGrounded: false,
     legAngle: 0
 };
 
-// الأشجار في الخلفية (3D Perspective)
-const trees = [];
-for (let i = 0; i < 8; i++) {
-    trees.push({
+// خلفيات اللعبة المتغيرة كل 10 حواجز
+const BACKGROUND_THEMES = ["default", "black", "gold", "green"];
+
+// أشجار خلفية
+const bgTrees = [];
+for (let i = 0; i < 6; i++) {
+    bgTrees.push({
         x: Math.random() * canvas.width * 2,
-        z: Math.random() * 0.8 + 0.2, // عمق 3D
-        height: 100 + Math.random() * 50
+        z: Math.random() * 0.6 + 0.3,
+        height: 80 + Math.random() * 40
     });
 }
 
-// العوائق العشوائية
-const obstacles = [];
+// حواجز شجر النخيل
+const palmObstacles = [];
 let obstacleTimer = 0;
 
-// طيور قادمة من نهاية الشاشة
+// عصافير تسير ببطء
 const birds = [];
 let birdTimer = 0;
 
@@ -67,13 +70,12 @@ let birdTimer = 0;
 const coins = [];
 let coinTimer = 0;
 
-// بكرة التحكم (Joystick)
+// بكرة التحكم
 const joystickContainer = document.getElementById("joystick-container");
 const joystickKnob = document.getElementById("joystick-knob");
 let isDraggingJoystick = false;
 let joystickStartX = 0;
 
-// تحكم البكرة
 joystickContainer.addEventListener("touchstart", (e) => {
     isDraggingJoystick = true;
     joystickStartX = e.touches[0].clientX;
@@ -83,19 +85,19 @@ window.addEventListener("touchmove", (e) => {
     if (!isDraggingJoystick) return;
     const currentX = e.touches[0].clientX;
     let diffX = currentX - joystickStartX;
-    diffX = Math.max(-35, Math.min(35, diffX)); // تقييد الحركة داخل البكرة
+    diffX = Math.max(-30, Math.min(30, diffX));
 
     joystickKnob.style.transform = `translateX(${diffX}px)`;
-    elephant.speedX = (diffX / 35) * elephant.maxSpeed;
+    elephant.speedX = (diffX / 30) * elephant.maxSpeed;
 });
 
 window.addEventListener("touchend", () => {
     isDraggingJoystick = false;
     joystickKnob.style.transform = `translateX(0px)`;
-    elephant.speedX = 0; // الوقوف عند التكاسل عن السحب
+    elephant.speedX = 0;
 });
 
-// زر القفز ومستويات القفز
+// القفز
 const jumpBtn = document.getElementById("jump-btn");
 jumpBtn.addEventListener("touchstart", (e) => {
     e.preventDefault();
@@ -112,7 +114,7 @@ function performJump() {
         currentJumpLevel = 0;
         elephant.dy = JUMP_LEVELS[currentJumpLevel].power;
         elephant.isGrounded = false;
-    } else if (currentJumpLevel < 2) { // قفزة ثانية أو ثالثة
+    } else if (currentJumpLevel < 2) {
         currentJumpLevel++;
         elephant.dy = JUMP_LEVELS[currentJumpLevel].power;
     }
@@ -131,11 +133,12 @@ window.addEventListener("keyup", (e) => {
 function resetGame() {
     score = 0;
     piCoins = 0;
+    passedObstaclesCount = 0;
     gameOver = false;
-    obstacles.length = 0;
+    palmObstacles.length = 0;
     birds.length = 0;
     coins.length = 0;
-    elephant.x = 100;
+    elephant.x = 80;
     elephant.y = canvas.height - 120;
     elephant.dy = 0;
     elephant.speedX = 0;
@@ -147,11 +150,11 @@ function update() {
     if (gameOver) return;
 
     gameFrame++;
-    const groundY = canvas.height - 80;
+    const groundY = canvas.height - 70;
 
-    // حركة الفيل الأفقية والعمودية
+    // حركة الفيل
     elephant.x += elephant.speedX;
-    elephant.x = Math.max(20, Math.min(canvas.width - elephant.width, elephant.x)); // تقييد الحركة بالحواف
+    elephant.x = Math.max(10, Math.min(canvas.width - elephant.width, elephant.x));
 
     elephant.dy += elephant.gravity;
     elephant.y += elephant.dy;
@@ -163,89 +166,90 @@ function update() {
         currentJumpLevel = 0;
     }
 
-    // حركة الأرجل
-    if (elephant.isGrounded && Math.abs(elephant.speedX) > 0.5) {
-        elephant.legAngle = Math.sin(gameFrame * 0.3) * 12;
+    if (elephant.isGrounded && Math.abs(elephant.speedX) > 0.3) {
+        elephant.legAngle = Math.sin(gameFrame * 0.3) * 10;
     }
 
-    // الأشجار 3D
-    trees.forEach(tree => {
-        tree.x -= (2 + elephant.speedX * 0.2) * tree.z;
-        if (tree.x < -100) tree.x = canvas.width + Math.random() * 200;
+    // أشجار الخلفية
+    bgTrees.forEach(tree => {
+        tree.x -= (1.5 + elephant.speedX * 0.2) * tree.z;
+        if (tree.x < -80) tree.x = canvas.width + Math.random() * 150;
     });
 
-    // توليد عوائق عشوائية
+    // توليد حواجز النخيل
     obstacleTimer++;
-    if (obstacleTimer > 90 + Math.random() * 50) {
-        obstacles.push({
+    if (obstacleTimer > 100 + Math.random() * 60) {
+        palmObstacles.push({
             x: canvas.width,
-            y: groundY - (30 + Math.random() * 30),
-            width: 35 + Math.random() * 20,
-            height: 35 + Math.random() * 25,
-            speed: 4 + Math.random() * 3
+            y: groundY - 60,
+            width: 40,
+            height: 60,
+            speed: 3.5 + Math.random() * 1.5
         });
         obstacleTimer = 0;
     }
 
-    // توليد طيور قادمة من نهاية اللعبة
+    // توليد العصافير (سير بطيء)
     birdTimer++;
-    if (birdTimer > 120 + Math.random() * 80) {
+    if (birdTimer > 140 + Math.random() * 80) {
         birds.push({
             x: canvas.width,
-            y: groundY - (100 + Math.random() * 120),
-            width: 40,
-            height: 30,
-            speed: 6 + Math.random() * 4,
-            wingAngle: 0
+            y: groundY - (80 + Math.random() * 120),
+            width: 35,
+            height: 25,
+            speed: 2.2 + Math.random() * 1.2, // بطيئة
+            wingPos: 0
         });
         birdTimer = 0;
     }
 
-    // توليد عملات Pi في أرتفاعات مختلفة للقفز
+    // توليد عملات Pi بكثرة لسهولة الجمع
     coinTimer++;
-    if (coinTimer > 60) {
+    if (coinTimer > 45) {
         coins.push({
             x: canvas.width,
-            y: groundY - (50 + Math.random() * 150),
-            radius: 16,
-            speed: 4
+            y: groundY - (35 + Math.random() * 130),
+            radius: 18, // حجم أكبر
+            speed: 3.5
         });
         coinTimer = 0;
     }
 
-    // تحديث العوائق والتصادم
-    for (let i = obstacles.length - 1; i >= 0; i--) {
-        let obs = obstacles[i];
-        obs.x -= obs.speed + elephant.speedX * 0.5;
+    // تحديث حواجز النخيل
+    for (let i = palmObstacles.length - 1; i >= 0; i--) {
+        let palm = palmObstacles[i];
+        palm.x -= palm.speed + elephant.speedX * 0.4;
 
-        if (checkCollision(elephant, obs)) gameOver = true;
-        if (obs.x + obs.width < 0) {
-            obstacles.splice(i, 1);
+        if (checkCollision(elephant, palm)) gameOver = true;
+
+        if (palm.x + palm.width < 0) {
+            palmObstacles.splice(i, 1);
             score += 10;
+            passedObstaclesCount++; // زيادة عدد الحواجز لتغيير اللون
         }
     }
 
-    // تحديث الطيور والتصادم
+    // تحديث العصافير
     for (let i = birds.length - 1; i >= 0; i--) {
         let bird = birds[i];
-        bird.x -= bird.speed + elephant.speedX * 0.5;
-        bird.wingAngle = Math.sin(gameFrame * 0.3) * 10;
+        bird.x -= bird.speed + elephant.speedX * 0.3;
+        bird.wingPos = Math.sin(gameFrame * 0.25) * 8; // رفرفة الجناحين
 
         if (checkCollision(elephant, bird)) gameOver = true;
         if (bird.x + bird.width < 0) birds.splice(i, 1);
     }
 
-    // جمع عملات Pi
+    // جمع عملات Pi مع مجال التقاط واسع وسهل
     for (let i = coins.length - 1; i >= 0; i--) {
         let coin = coins[i];
-        coin.x -= coin.speed + elephant.speedX * 0.5;
+        coin.x -= coin.speed + elephant.speedX * 0.4;
 
         let dist = Math.hypot((elephant.x + elephant.width/2) - coin.x, (elephant.y + elephant.height/2) - coin.y);
-        if (dist < coin.radius + 25) {
+        if (dist < coin.radius + 45) { // زيادة نطاق التقاط العملة بسهولة
             piCoins++;
             score += 20;
             coins.splice(i, 1);
-        } else if (coin.x < -20) {
+        } else if (coin.x < -30) {
             coins.splice(i, 1);
         }
     }
@@ -259,140 +263,203 @@ function update() {
     }
 }
 
-function checkCollision(rect1, rect2) {
+function checkCollision(r1, r2) {
     return (
-        rect1.x < rect2.x + rect2.width &&
-        rect1.x + rect1.width > rect2.x &&
-        rect1.y < rect2.y + rect2.height &&
-        rect1.y + rect1.height > rect2.y
+        r1.x < r2.x + r2.width - 8 &&
+        r1.x + r1.width - 8 > r2.x &&
+        r1.y < r2.y + r2.height - 5 &&
+        r1.y + r1.height > r2.y
     );
 }
 
-// رسم ثلاثي الأبعاد والرسوم الفنية
 function draw() {
-    const groundY = canvas.height - 80;
+    const groundY = canvas.height - 70;
 
-    // السماء (Gradient 3D)
-    let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    skyGrad.addColorStop(0, "#1a2a6c");
-    skyGrad.addColorStop(0.5, "#b21f1f");
-    skyGrad.addColorStop(1, "#fdbb2d");
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // تحديد لون الخلفية بناءً على كل 10 حواجز
+    let themeIndex = Math.floor(passedObstaclesCount / 10) % BACKGROUND_THEMES.length;
+    let currentTheme = BACKGROUND_THEMES[themeIndex];
 
-    // الأشجار 3D بالعمق
-    trees.forEach(tree => {
-        ctx.fillStyle = `rgba(34, 139, 34, ${tree.z})`;
+    if (currentTheme === "black") {
+        ctx.fillStyle = "#0a0a0a";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    } else if (currentTheme === "gold") {
+        let goldGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        goldGrad.addColorStop(0, "#f39c12");
+        goldGrad.addColorStop(1, "#f1c40f");
+        ctx.fillStyle = goldGrad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    } else if (currentTheme === "green") {
+        let greenGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        greenGrad.addColorStop(0, "#11998e");
+        greenGrad.addColorStop(1, "#38ef7d");
+        ctx.fillStyle = greenGrad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    } else {
+        // السماء الافتراضية
+        let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        skyGrad.addColorStop(0, "#2980b9");
+        skyGrad.addColorStop(1, "#6dd5fa");
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // أشجار الخلفية
+    bgTrees.forEach(tree => {
+        ctx.fillStyle = `rgba(46, 204, 113, ${tree.z * 0.7})`;
         ctx.beginPath();
-        ctx.arc(tree.x, groundY - tree.height, 40 * tree.z, 0, Math.PI * 2);
+        ctx.arc(tree.x, groundY - tree.height, 35 * tree.z, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = `rgba(101, 67, 33, ${tree.z})`;
-        ctx.fillRect(tree.x - 5 * tree.z, groundY - tree.height, 10 * tree.z, tree.height);
+        ctx.fillStyle = `rgba(120, 80, 40, ${tree.z * 0.7})`;
+        ctx.fillRect(tree.x - 4 * tree.z, groundY - tree.height, 8 * tree.z, tree.height);
     });
 
-    // الأرضية مع تجسيم 3D
-    ctx.fillStyle = "#2d8a4e";
-    ctx.fillRect(0, groundY, canvas.width, 80);
-    ctx.fillStyle = "#1b5e20";
-    ctx.fillRect(0, groundY, canvas.width, 10);
+    // الأرضية
+    ctx.fillStyle = "#27ae60";
+    ctx.fillRect(0, groundY, canvas.width, 70);
+    ctx.fillStyle = "#219150";
+    ctx.fillRect(0, groundY, canvas.width, 8);
 
-    // رسم الفيل
+    // الفيل
     drawElephant(elephant.x, elephant.y);
 
-    // رسم العوائق
-    ctx.fillStyle = "#5d4037";
-    obstacles.forEach(obs => {
-        ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-    });
+    // رسم شجر النخيل (الحواجز)
+    palmObstacles.forEach(drawPalmTree);
 
-    // رسم الطيور
-    birds.forEach(bird => {
-        ctx.fillStyle = "#e74c3c";
-        ctx.beginPath();
-        ctx.arc(bird.x, bird.y, 12, 0, Math.PI * 2);
-        ctx.fill();
-        // الأجنحة
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(bird.x, bird.y);
-        ctx.lineTo(bird.x - 15, bird.y - 10 + bird.wingAngle);
-        ctx.stroke();
-    });
+    // رسم العصافير
+    birds.forEach(drawBird);
 
-    // رسم عملة Pi Network المستديرة
-    coins.forEach(coin => {
-        ctx.fillStyle = "#f39c12";
-        ctx.beginPath();
-        ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 2;
-        ctx.stroke();
+    // رسم عملات Pi
+    coins.forEach(drawPiCoin);
 
-        // رمز Pi
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 14px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText("π", coin.x, coin.y + 5);
-    });
-
-    // الواجهة والنتيجة
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 20px Arial";
+    // معلومات اللعبة
+    ctx.fillStyle = currentTheme === "gold" ? "#000" : "#fff";
+    ctx.font = "bold 18px Arial";
     ctx.textAlign = "left";
-    ctx.fillText(`النقاط: ${score}`, 20, 35);
-    ctx.fillText(`عملات Pi: ${piCoins} π`, 20, 65);
-    ctx.fillText(`مستوى القفز: ${currentJumpLevel + 1}/3`, 20, 95);
+    ctx.fillText(`النقاط: ${score}`, 15, 30);
+    ctx.fillText(`عملات Pi: ${piCoins} π`, 15, 58);
+    ctx.fillText(`مستوى القفز: ${currentJumpLevel + 1}/3`, 15, 86);
 }
 
+// رسم الفيل
 function drawElephant(x, y) {
     ctx.save();
     ctx.translate(x, y);
 
-    // الأرجل
     ctx.fillStyle = "#7f8c8d";
-    ctx.fillRect(10 - elephant.legAngle/2, 38, 12, 18);
-    ctx.fillRect(45 + elephant.legAngle/2, 38, 12, 18);
+    ctx.fillRect(10 - elephant.legAngle/2, 35, 10, 16);
+    ctx.fillRect(40 + elephant.legAngle/2, 35, 10, 16);
 
-    // جسم الفيل مجسم
     ctx.fillStyle = "#95a5a6";
     ctx.beginPath();
-    ctx.arc(35, 25, 26, 0, Math.PI * 2);
+    ctx.arc(30, 22, 22, 0, Math.PI * 2);
     ctx.fill();
 
-    // الرأس
     ctx.beginPath();
-    ctx.arc(58, 18, 16, 0, Math.PI * 2);
+    ctx.arc(50, 16, 14, 0, Math.PI * 2);
     ctx.fill();
 
-    // العين
     ctx.fillStyle = "#000";
     ctx.beginPath();
-    ctx.arc(62, 14, 3, 0, Math.PI * 2);
+    ctx.arc(54, 12, 2.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // الخرطوم
     ctx.strokeStyle = "#95a5a6";
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.moveTo(68, 20);
-    ctx.lineTo(78, 30);
+    ctx.moveTo(60, 18);
+    ctx.lineTo(68, 28);
     ctx.stroke();
 
     ctx.restore();
 }
 
+// رسم حاجز النخيل
+function drawPalmTree(palm) {
+    ctx.save();
+    ctx.translate(palm.x, palm.y);
+
+    // جذع النخلة
+    ctx.fillStyle = "#795548";
+    ctx.fillRect(palm.width / 2 - 5, 15, 10, palm.height - 15);
+
+    // أوراق النخلة
+    ctx.fillStyle = "#1b5e20";
+    for (let i = 0; i < 5; i++) {
+        ctx.beginPath();
+        ctx.ellipse(palm.width / 2, 15, 18, 6, (i * Math.PI) / 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+// رسم العصفور المرفرف
+function drawBird(bird) {
+    ctx.save();
+    ctx.translate(bird.x, bird.y);
+
+    // جسم العصفور
+    ctx.fillStyle = "#e74c3c";
+    ctx.beginPath();
+    ctx.ellipse(15, 12, 12, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // المنقار
+    ctx.fillStyle = "#f39c12";
+    ctx.beginPath();
+    ctx.moveTo(0, 12);
+    ctx.lineTo(-8, 9);
+    ctx.lineTo(-8, 15);
+    ctx.fill();
+
+    // العين
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(6, 9, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.arc(5, 9, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // الأجنحة المرفرفة
+    ctx.fillStyle = "#c0392b";
+    ctx.beginPath();
+    ctx.ellipse(16, 12, 8, 4, bird.wingPos * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+}
+
+// رسم عملة Pi
+function drawPiCoin(coin) {
+    ctx.save();
+    ctx.fillStyle = "#f39c12";
+    ctx.beginPath();
+    ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 15px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("π", coin.x, coin.y + 5);
+    ctx.restore();
+}
+
 function showGameOver() {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.fillStyle = "#FFF";
-    ctx.font = "bold 32px Arial";
+    ctx.font = "bold 28px Arial";
     ctx.textAlign = "center";
     ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2 - 20);
-    ctx.font = "20px Arial";
-    ctx.fillText(`مجموع نقاطك: ${score} | عملات Pi المجمعة: ${piCoins} π`, canvas.width / 2, canvas.height / 2 + 20);
+    ctx.font = "18px Arial";
+    ctx.fillText(`مجموع نقاطك: ${score} | عملات Pi: ${piCoins} π`, canvas.width / 2, canvas.height / 2 + 20);
     ctx.fillText("إلمس زر القفز للعب مجدداً", canvas.width / 2, canvas.height / 2 + 60);
 }
 
