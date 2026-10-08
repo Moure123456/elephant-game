@@ -2,9 +2,15 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لعبة الفيل القافز مع الأصوات</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>لعبة الفيل القافز</title>
     <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -13,25 +19,49 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: white;
+            overflow: hidden;
         }
 
         h1 {
-            margin-bottom: 10px;
+            margin: 5px 0;
+            font-size: 20px;
         }
 
         #gameCanvas {
-            border: 4px solid #fff;
+            border: 3px solid #fff;
             border-radius: 8px;
-            background-color: #87CEEB; /* لون السماء */
+            background-color: #87CEEB;
             box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            max-width: 95vw;
+            max-height: 60vh;
+            touch-action: manipulation;
         }
 
-        .instructions {
+        .controls {
             margin-top: 15px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            background-color: #e67e22;
+            color: white;
+            border: none;
+            padding: 12px 24px;
             font-size: 18px;
+            font-weight: bold;
+            border-radius: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            background-color: #d35400;
         }
     </style>
 </head>
@@ -39,13 +69,19 @@
 
     <h1>🐘 لعبة الفيل القافز</h1>
     <canvas id="gameCanvas" width="800" height="400"></canvas>
-    <div class="instructions"><b>Space</b> للقفز | <b>R</b> للإعادة | <b>Esc</b> لإغلاق اللعبة</div>
+
+    <div class="controls">
+        <button class="btn" id="jumpBtn">⬆️ قفز</button>
+        <button class="btn" id="restartBtn" style="background-color: #27ae60;">🔄 إعادة</button>
+    </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const jumpBtn = document.getElementById('jumpBtn');
+        const restartBtn = document.getElementById('restartBtn');
 
-        // ==================== نظام الصوت (Web Audio API) ====================
+        // نظام الصوت (Web Audio API)
         let audioCtx = null;
 
         function initAudio() {
@@ -54,134 +90,41 @@
             }
         }
 
-        // 1. صوت القفز
         function playJumpSound() {
             if (!audioCtx) return;
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.connect(gain);
             gain.connect(audioCtx.destination);
-
             osc.type = 'sine';
             osc.frequency.setValueAtTime(150, audioCtx.currentTime);
             osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.15);
-
             gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-
             osc.start();
             osc.stop(audioCtx.currentTime + 0.15);
         }
 
-        // 2. صوت جمع العملات
-        function playCoinSound() {
-            if (!audioCtx) return;
-            const now = audioCtx.currentTime;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(987.77, now); // نغمة B5
-            osc.frequency.setValueAtTime(1318.51, now + 0.08); // نغمة E6
-
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-
-            osc.start(now);
-            osc.stop(now + 0.25);
-        }
-
-        // 3. صوت بدء اللعبة
-        function playStartSound() {
-            if (!audioCtx) return;
-            const notes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
-            notes.forEach((freq, index) => {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-
-                const startTime = audioCtx.currentTime + index * 0.08;
-                osc.frequency.setValueAtTime(freq, startTime);
-
-                gain.gain.setValueAtTime(0.2, startTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.1);
-
-                osc.start(startTime);
-                osc.stop(startTime + 0.1);
-            });
-        }
-
-        // 4. صوت الخسارة
         function playGameOverSound() {
             if (!audioCtx) return;
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.connect(gain);
             gain.connect(audioCtx.destination);
-
             osc.type = 'sawtooth';
             osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.6);
-
-            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
-
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.6);
-        }
-
-        // 5. صوت الفوز
-        function playWinSound() {
-            if (!audioCtx) return;
-            const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
-            notes.forEach((freq, index) => {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-
-                const startTime = audioCtx.currentTime + index * 0.12;
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(freq, startTime);
-
-                gain.gain.setValueAtTime(0.25, startTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.2);
-
-                osc.start(startTime);
-                osc.stop(startTime + 0.2);
-            });
-        }
-
-        // 6. صوت إغلاق اللعبة
-        function playCloseSound() {
-            if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.3);
-
+            osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.5);
             gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
             osc.start();
-            osc.stop(audioCtx.currentTime + 0.3);
+            osc.stop(audioCtx.currentTime + 0.5);
         }
 
-        // ==================== حالة اللعبة ====================
+        // حالة اللعبة
         let score = 0;
         let gameOver = false;
-        let gameWon = false;
-        let gameClosed = false;
         let frameCount = 0;
 
-        // إعدادات الفيل
         const elephant = {
             x: 80,
             y: 280,
@@ -215,7 +158,7 @@
                 ctx.stroke();
             },
             jump() {
-                if (this.isGrounded) {
+                if (this.isGrounded && !gameOver) {
                     this.velocityY = this.jumpPower;
                     this.isGrounded = false;
                     playJumpSound();
@@ -233,9 +176,7 @@
             }
         };
 
-        // مصفوفات العناصر
         const obstacles = [];
-        const coins = [];
         const obstacleWidth = 30;
 
         function spawnObstacle() {
@@ -246,16 +187,6 @@
                 width: obstacleWidth,
                 height: height
             });
-
-            // احتمال 50% لتوليد عملة ذهبية فوق الحاجز
-            if (Math.random() > 0.5) {
-                coins.push({
-                    x: canvas.width + 5,
-                    y: 330 - height - 40,
-                    radius: 12,
-                    collected: false
-                });
-            }
         }
 
         function drawEnvironment() {
@@ -275,72 +206,43 @@
             );
         }
 
-        function checkCoinCollision(circle, rect) {
-            const closeX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.width));
-            const closeY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.height));
-            const distX = circle.x - closeX;
-            const distY = circle.y - closeY;
-            return (distX * distX + distY * distY) < (circle.radius * circle.radius);
-        }
-
         function resetGame() {
             score = 0;
             obstacles.length = 0;
-            coins.length = 0;
             elephant.y = 280;
             elephant.velocityY = 0;
             gameOver = false;
-            gameWon = false;
-            gameClosed = false;
-            playStartSound();
             loop();
         }
 
-        // الحلقة البرمجية الرئيسية
-        function loop() {
-            if (gameClosed) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold 32px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('تم إغلاق اللعبة', canvas.width / 2, canvas.height / 2);
-                ctx.font = '18px Arial';
-                ctx.fillText('اضغط على R للبدء من جديد', canvas.width / 2, canvas.height / 2 + 40);
-                return;
+        function handleJump(e) {
+            if (e) e.preventDefault();
+            initAudio();
+            if (gameOver) {
+                resetGame();
+            } else {
+                elephant.jump();
             }
+        }
 
+        function loop() {
             if (gameOver) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#e74c3c';
-                ctx.font = 'bold 36px Arial';
+
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 32px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText('انتهت اللعبة!', canvas.width / 2, canvas.height / 2 - 20);
-                ctx.fillStyle = '#fff';
                 ctx.font = '20px Arial';
-                ctx.fillText(`النتيجة النهاية: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
-                ctx.fillText('اضغط على R لإعادة اللعب', canvas.width / 2, canvas.height / 2 + 60);
-                return;
-            }
-
-            if (gameWon) {
-                ctx.fillStyle = 'rgba(46, 204, 113, 0.8)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold 40px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('🎉 مبروك! لقد فزت! 🎉', canvas.width / 2, canvas.height / 2 - 20);
-                ctx.font = '22px Arial';
-                ctx.fillText(`جمعت ${score} نقطة!`, canvas.width / 2, canvas.height / 2 + 25);
-                ctx.fillText('اضغط على R للعب مرة أخرى', canvas.width / 2, canvas.height / 2 + 65);
+                ctx.fillText(`النقاط: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
+                ctx.fillText('اضغط إعادة للعب مجددًا', canvas.width / 2, canvas.height / 2 + 60);
                 return;
             }
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             drawEnvironment();
-
             elephant.update();
             elephant.draw();
 
@@ -349,7 +251,6 @@
                 spawnObstacle();
             }
 
-            // رسم وتحريك الحواجز
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 const obs = obstacles[i];
                 obs.x -= 6;
@@ -366,42 +267,10 @@
 
                 if (obs.x + obs.width < 0) {
                     obstacles.splice(i, 1);
-                    score += 5;
+                    score += 10;
                 }
             }
 
-            // رسم وتحريك العملات
-            for (let i = coins.length - 1; i >= 0; i--) {
-                const coin = coins[i];
-                coin.x -= 6;
-
-                // رسم العملة الذهبية
-                ctx.fillStyle = '#f1c40f';
-                ctx.beginPath();
-                ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = '#f39c12';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                // كشف جمع العملة
-                if (!coin.collected && checkCoinCollision(coin, elephant)) {
-                    coin.collected = true;
-                    coins.splice(i, 1);
-                    score += 15;
-                    playCoinSound();
-
-                    // الشرط المخصص للفوز (مثلاً عند الوصول إلى 100 نقطة)
-                    if (score >= 100 && !gameWon) {
-                        gameWon = true;
-                        playWinSound();
-                    }
-                } else if (coin.x + coin.radius < 0) {
-                    coins.splice(i, 1);
-                }
-            }
-
-            // عرض النتيجة
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 22px Arial';
             ctx.textAlign = 'left';
@@ -410,36 +279,19 @@
             requestAnimationFrame(loop);
         }
 
-        // الاستماع للأزرار
+        // دعم أحداث اللمس والماوس ولوحة المفاتيح
+        canvas.addEventListener('touchstart', handleJump);
+        canvas.addEventListener('mousedown', handleJump);
+        jumpBtn.addEventListener('touchstart', handleJump);
+        jumpBtn.addEventListener('click', handleJump);
+
+        restartBtn.addEventListener('click', () => { initAudio(); resetGame(); });
+        restartBtn.addEventListener('touchstart', (e) => { e.preventDefault(); initAudio(); resetGame(); });
+
         document.addEventListener('keydown', (e) => {
-            initAudio(); // تفعيل الصوت عند أول ضغطة زر
-
-            if (e.code === 'Space') {
-                e.preventDefault();
-                if (!gameOver && !gameWon && !gameClosed) {
-                    elephant.jump();
-                }
-            }
-
-            if (e.code === 'KeyR') {
-                if (gameOver || gameWon || gameClosed) {
-                    resetGame();
-                }
-            }
-
-            if (e.code === 'Escape' && !gameClosed) {
-                gameClosed = true;
-                playCloseSound();
-            }
+            if (e.code === 'Space') handleJump(e);
+            if (e.code === 'KeyR' && gameOver) resetGame();
         });
-
-        // تشغيل صوت البدء عند تحريك الماوس أو النقر لتجاوز قيود حظر الصوت التلقائي
-        window.addEventListener('click', () => {
-            if (!audioCtx) {
-                initAudio();
-                playStartSound();
-            }
-        }, { once: true });
 
         loop();
     </script>
