@@ -1,31 +1,137 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elephant Jump Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
+    <title>Elephant Pi Adventure 3D</title>
+    <!-- مكتبة Pi SDK -->
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
     <style>
-        body {
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
             margin: 0;
             padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #111;
+            font-family: Arial, sans-serif;
+        }
+
+        /* تحذير تدوير الشاشة لوضع الأفقي */
+        #portrait-warning {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #111;
+            color: #fff;
+            z-index: 9999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-size: 20px;
+            padding: 20px;
+        }
+
+        @media screen and (orientation: portrait) {
+            #portrait-warning {
+                display: flex;
+            }
+        }
+
+        /* حاوية اللعبة */
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            background-color: #f0f0f0;
-            font-family: sans-serif;
         }
+
         canvas {
-            border: 2px solid #333;
-            background-color: #87CEEB;
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #000;
+        }
+
+        /* زر القفز في الجانب الأيسر */
+        #jump-btn {
+            position: absolute;
+            left: 30px;
+            bottom: 30px;
+            width: 90px;
+            height: 90px;
+            background: rgba(255, 165, 0, 0.8);
+            border: 3px solid #fff;
+            border-radius: 50%;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            touch-action: manipulation;
+            z-index: 10;
+        }
+
+        #jump-btn:active {
+            background: rgba(255, 140, 0, 1);
+            transform: scale(0.95);
+        }
+
+        /* بكرة التحكم بالسرعة في الجانب الأيمن السفلي */
+        #joystick-container {
+            position: absolute;
+            right: 40px;
+            bottom: 30px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        #joystick-knob {
+            position: absolute;
+            top: 35px;
+            left: 35px;
+            width: 50px;
+            height: 50px;
+            background: #8e44ad;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         }
     </style>
 </head>
 <body>
 
-    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <div id="portrait-warning">
+        <p>🔄 يرجى تدوير الهاتف للوضع الأفقي (Landscape) للعب</p>
+    </div>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- زر القفز -->
+        <div id="jump-btn">قفز ⬆️</div>
+
+        <!-- بكرة التحكم بالسرعة والاتجاه -->
+        <div id="joystick-container">
+            <div id="joystick-knob"></div>
+        </div>
+    </div>
 
     <script src="script.js"></script>
 </body>
 </html>
-
