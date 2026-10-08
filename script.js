@@ -1,17 +1,16 @@
 // ==========================================
-// 1. إعداد المؤثرات الصوتية (Audio Setup)
+// 1. إعداد الأصوات (Audio Setup)
 // ==========================================
 const soundJump = new Audio('https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg');
 const soundScore = new Audio('https://actions.google.com/sounds/v1/cartoon/pop.ogg');
 const soundGameOver = new Audio('https://actions.google.com/sounds/v1/cartoon/clime_up_and_fall.ogg');
 
-// ضبط مستويات الصوت (0.0 إلى 1.0)
 soundJump.volume = 0.5;
 soundScore.volume = 0.6;
 soundGameOver.volume = 0.7;
 
 // ==========================================
-// 2. إعداد العناصر والسطح (Canvas Setup)
+// 2. إعداد شاشة اللعبة (Canvas Setup)
 // ==========================================
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -24,36 +23,69 @@ resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 
 // ==========================================
-// 3. حالة اللعبة واللاعب (Player & Game State)
+// 3. حالة اللعبة واللاعب (Elephant)
 // ==========================================
-let score = 0;
+let piScore = 0; // رصيد عملات Pi المجمعة
 let gameOver = false;
+let frameCount = 0;
 
-const player = {
-    x: 100,
-    y: canvas.height - 150,
-    width: 60,
+const elephant = {
+    x: 80,
+    y: canvas.height - 170,
+    width: 70,
     height: 60,
     velocityY: 0,
     gravity: 0.8,
     jumpPower: -15,
-    isGrounded: false,
-    speed: 5
+    isGrounded: false
 };
 
 // ==========================================
-// 4. التحكم والدعم اللمسي (Controls)
+// 4. عناصر البيئة (شجر النخل، العوائق، وعملة Pi)
+// ==========================================
+let palmTrees = [];
+let obstacles = [];
+let piCoins = [];
+
+// إنشاء شجر النخل في الخلفية
+for (let i = 0; i < 5; i++) {
+    palmTrees.push({
+        x: i * 250 + Math.random() * 50,
+        speed: 1.5
+    });
+}
+
+function spawnObstacle() {
+    obstacles.push({
+        x: canvas.width,
+        y: canvas.height - 110,
+        width: 35,
+        height: 50,
+        speed: 5.5
+    });
+}
+
+function spawnPiCoin() {
+    piCoins.push({
+        x: canvas.width,
+        y: canvas.height - 180 - Math.random() * 80,
+        radius: 18,
+        speed: 5.5
+    });
+}
+
+// ==========================================
+// 5. التحكم بالقفز
 // ==========================================
 const jumpBtn = document.getElementById('jump-btn');
 
 function triggerJump() {
-    if (player.isGrounded && !gameOver) {
-        player.velocityY = player.jumpPower;
-        player.isGrounded = false;
+    if (elephant.isGrounded && !gameOver) {
+        elephant.velocityY = elephant.jumpPower;
+        elephant.isGrounded = false;
         
-        // تشغيل صوت القفز
         soundJump.currentTime = 0;
-        soundJump.play().catch(e => console.log("Audio play deferred"));
+        soundJump.play().catch(e => console.log("Audio ready"));
     } else if (gameOver) {
         restartGame();
     }
@@ -69,67 +101,129 @@ window.addEventListener('keydown', (e) => {
 });
 
 // ==========================================
-// 5. العوائق والمكافآت (Obstacles & Collectibles)
+// 6. دالـة الرسم المتكاملة (Drawing)
 // ==========================================
-let obstacles = [];
-let coins = [];
-let frameCount = 0;
 
-function spawnObstacle() {
-    obstacles.push({
-        x: canvas.width,
-        y: canvas.height - 100,
-        width: 40,
-        height: 50,
-        speed: 6
-    });
+// رسم شجرة النخل والبلح
+function drawPalmTree(x) {
+    const groundY = canvas.height - 60;
+    // الجذع
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(x + 15, groundY - 120, 15, 120);
+    
+    // أوراق النخلة
+    ctx.fillStyle = '#2E8B57';
+    ctx.beginPath();
+    ctx.arc(x + 22, groundY - 120, 45, 0, Math.PI * 2);
+    ctx.fill();
+
+    // البلح الأحمر
+    ctx.fillStyle = '#D22B2B';
+    ctx.beginPath();
+    ctx.arc(x + 12, groundY - 110, 6, 0, Math.PI * 2);
+    ctx.arc(x + 32, groundY - 110, 6, 0, Math.PI * 2);
+    ctx.fill();
 }
 
-function spawnCoin() {
-    coins.push({
-        x: canvas.width,
-        y: canvas.height - 180 - Math.random() * 100,
-        radius: 15,
-        speed: 6
-    });
+// رسم الفيل بشكل مميز
+function drawElephant(x, y, w, h) {
+    // جسم الفيل
+    ctx.fillStyle = '#708090';
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 15);
+    ctx.fill();
+
+    // الأذن
+    ctx.fillStyle = '#A9A9A9';
+    ctx.beginPath();
+    ctx.arc(x + 15, y + 25, 16, 0, Math.PI * 2);
+    ctx.fill();
+
+    // العين
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(x + w - 20, y + 18, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(x + w - 18, y + 18, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // الخرطوم
+    ctx.fillStyle = '#708090';
+    ctx.beginPath();
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = '#708090';
+    ctx.moveTo(x + w - 5, y + 30);
+    ctx.quadraticCurveTo(x + w + 15, y + 35, x + w + 10, y + 50);
+    ctx.stroke();
+
+    // الأنياب
+    ctx.fillStyle = '#FFF8DC';
+    ctx.beginPath();
+    ctx.arc(x + w - 2, y + 38, 4, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// رسم عملة Pi
+function drawPiCoin(coin) {
+    // القرص الذهبي
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#B8860B';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // رمز Pi بالمنتصف (π)
+    ctx.fillStyle = '#7B1FA2';
+    ctx.font = 'bold 18px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('π', coin.x, coin.y + 1);
 }
 
 // ==========================================
-// 6. الحلقة الرئيسية للعبة (Game Loop)
+// 7. تحديث الحركة والفيزياء (Update)
 // ==========================================
 function update() {
     if (gameOver) return;
 
     frameCount++;
 
-    // تطبيق الفيزياء على الفيل
-    player.velocityY += player.gravity;
-    player.y += player.velocityY;
+    // حركة خلفية شجر النخل
+    palmTrees.forEach(tree => {
+        tree.x -= tree.speed;
+        if (tree.x < -100) tree.x = canvas.width + Math.random() * 50;
+    });
 
-    const groundLevel = canvas.height - 100 - player.height;
-    if (player.y >= groundLevel) {
-        player.y = groundLevel;
-        player.velocityY = 0;
-        player.isGrounded = true;
+    // فيزياء حركة الفيل
+    elephant.velocityY += elephant.gravity;
+    elephant.y += elephant.velocityY;
+
+    const groundLevel = canvas.height - 60 - elephant.height;
+    if (elephant.y >= groundLevel) {
+        elephant.y = groundLevel;
+        elephant.velocityY = 0;
+        elephant.isGrounded = true;
     }
 
     // توليد العوائق والعملات
-    if (frameCount % 120 === 0) spawnObstacle();
-    if (frameCount % 90 === 0) spawnCoin();
+    if (frameCount % 130 === 0) spawnObstacle();
+    if (frameCount % 85 === 0) spawnPiCoin();
 
     // تحديث العوائق واختبار الاصطدام
     for (let i = obstacles.length - 1; i >= 0; i--) {
         obstacles[i].x -= obstacles[i].speed;
 
-        // فحص الاصطدام مع الفيل
         if (
-            player.x < obstacles[i].x + obstacles[i].width &&
-            player.x + player.width > obstacles[i].x &&
-            player.y < obstacles[i].y + obstacles[i].height &&
-            player.y + player.height > obstacles[i].y
+            elephant.x < obstacles[i].x + obstacles[i].width &&
+            elephant.x + elephant.width > obstacles[i].x &&
+            elephant.y < obstacles[i].y + obstacles[i].height &&
+            elephant.y + elephant.height > obstacles[i].y
         ) {
             gameOver = true;
-            // تشغيل صوت الخسارة
             soundGameOver.currentTime = 0;
             soundGameOver.play().catch(e => console.log("Audio play deferred"));
         }
@@ -139,91 +233,95 @@ function update() {
         }
     }
 
-    // تحديث العملات وتجميع النقاط
-    for (let i = coins.length - 1; i >= 0; i--) {
-        coins[i].x -= coins[i].speed;
+    // تحديث عملات Pi وتجميعها للمحفظة
+    for (let i = piCoins.length - 1; i >= 0; i--) {
+        piCoins[i].x -= piCoins[i].speed;
 
-        // فحص تجميع النقاط
-        let distX = (player.x + player.width / 2) - coins[i].x;
-        let distY = (player.y + player.height / 2) - coins[i].y;
+        let distX = (elephant.x + elephant.width / 2) - piCoins[i].x;
+        let distY = (elephant.y + elephant.height / 2) - piCoins[i].y;
         let distance = Math.sqrt(distX * distX + distY * distY);
 
-        if (distance < player.width / 2 + coins[i].radius) {
-            score += 10;
-            coins.splice(i, 1);
+        if (distance < elephant.width / 2 + piCoins[i].radius) {
+            piScore += 1; // زيادة عملة Pi
+            piCoins.splice(i, 1);
 
-            // تشغيل صوت جمع النقاط
             soundScore.currentTime = 0;
             soundScore.play().catch(e => console.log("Audio play deferred"));
             continue;
         }
 
-        if (coins[i].x + coins[i].radius < 0) {
-            coins.splice(i, 1);
+        if (piCoins[i].x + piCoins[i].radius < 0) {
+            piCoins.splice(i, 1);
         }
     }
 }
 
+// ==========================================
+// 8. الدالة الرئيسية للرسم والشاشة (Draw Loop)
+// ==========================================
 function draw() {
-    // رسم الخلفية والسماء
-    ctx.fillStyle = '#1a1a2e';
+    // رسم السماء الغروب
+    let gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#2c3e50');
+    gradient.addColorStop(1, '#4ca1af');
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // رسم الأرض
-    ctx.fillStyle = '#228B22';
-    ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+    // رسم خلفية شجر النخل والبلح
+    palmTrees.forEach(tree => drawPalmTree(tree.x));
 
-    // رسم الفيل (تمثيل مبسط)
-    ctx.fillStyle = '#7f8c8d';
-    ctx.fillRect(player.x, player.y, player.width, player.height);
-    // عين الفيل
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(player.x + 40, player.y + 10, 10, 10);
+    // رسم الأرضية
+    ctx.fillStyle = '#27ae60';
+    ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
+
+    // رسم الفيل
+    drawElephant(elephant.x, elephant.y, elephant.width, elephant.height);
 
     // رسم العوائق
-    ctx.fillStyle = '#e74c3c';
+    ctx.fillStyle = '#c0392b';
     obstacles.forEach(obs => {
         ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
     });
 
-    // رسم المكافآت/العملات
-    ctx.fillStyle = '#f1c40f';
-    coins.forEach(coin => {
-        ctx.beginPath();
-        ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
-        ctx.fill();
-    });
+    // رسم عملات Pi
+    piCoins.forEach(coin => drawPiCoin(coin));
 
-    // عرض النتيجة
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 24px Arial';
+    // عرض واجهة المحفظة والرصيد
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.roundRect(15, 15, 190, 45, 10);
+    ctx.fill();
+
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 20px Arial';
     ctx.direction = 'rtl';
-    ctx.fillText(`النقاط: ${score}`, canvas.width - 120, 50);
+    ctx.textAlign = 'right';
+    ctx.fillText(`محفظة Pi: ${piScore} π`, 190, 45);
 
-    // شاشة الخسارة
+    // شاشة إعادة اللعب عند الخسارة
     if (gameOver) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         ctx.fillStyle = '#e74c3c';
-        ctx.font = 'bold 36px Arial';
+        ctx.font = 'bold 34px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('انتهت اللعبة!', canvas.width / 2, canvas.height / 2 - 20);
+        ctx.fillText('اصطدم الفيل!', canvas.width / 2, canvas.height / 2 - 20);
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = '20px Arial';
-        ctx.fillText('اضغط قفز لإعادة اللعب', canvas.width / 2, canvas.height / 2 + 30);
+        ctx.font = '18px Arial';
+        ctx.fillText(`جمعت ${piScore} عملة Pi في المحفظة`, canvas.width / 2, canvas.height / 2 + 20);
+        ctx.fillText('اضغط قفز لإعادة اللعب', canvas.width / 2, canvas.height / 2 + 60);
     }
 }
 
 function restartGame() {
-    score = 0;
+    piScore = 0;
     obstacles = [];
-    coins = [];
+    piCoins = [];
     frameCount = 0;
     gameOver = false;
-    player.y = canvas.height - 150;
-    player.velocityY = 0;
+    elephant.y = canvas.height - 170;
+    elephant.velocityY = 0;
     loop();
 }
 
