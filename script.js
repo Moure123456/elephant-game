@@ -6,7 +6,7 @@ if (window.Pi) {
         window.Pi.init({ version: "2.0", sandbox: true });
         window.Pi.authenticate(['username', 'wallet_address'], function(payment) {})
           .then(function(auth) {
-              if (auth.user.walletAddress) {
+              if (auth.user && auth.user.walletAddress) {
                   piUserAddress = auth.user.walletAddress;
                   localStorage.setItem("pi_wallet_address", piUserAddress);
               }
@@ -27,7 +27,6 @@ resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
 let score = 0;
-// استرجاع عملات Pi المحفوظة دائمًا
 let totalPiCoins = parseInt(localStorage.getItem("total_pi_coins")) || 0;
 let currentSessionCoins = 0;
 
@@ -140,7 +139,6 @@ function performJump() {
     }
 }
 
-// دعم لوحة المفاتيح
 window.addEventListener("keydown", (e) => {
     if (e.code === "Space") performJump();
     if (e.code === "ArrowRight") elephant.speedX = 5;
@@ -194,15 +192,12 @@ function update() {
     gameFrame++;
     const groundY = canvas.height - 70;
 
-    // السرعة: بطيئة أول 50 نخلة، ثم عادية
     let speedMultiplier = passedObstaclesCount < 50 ? 0.65 : 1.0;
 
-    // تغير لون الفيل عشوائياً
     if (gameFrame % 40 === 0 && Math.abs(elephant.speedX) > 0.1) {
         currentElephantColor = ELEPHANT_COLORS[Math.floor(Math.random() * ELEPHANT_COLORS.length)];
     }
 
-    // حركة الفيل
     elephant.x += elephant.speedX;
     elephant.x = Math.max(10, Math.min(canvas.width - elephant.width, elephant.x));
 
@@ -220,13 +215,11 @@ function update() {
         elephant.legAngle = Math.sin(gameFrame * 0.3) * 10;
     }
 
-    // أشجار الخلفية
     bgTrees.forEach(tree => {
         tree.x -= (1.5 + elephant.speedX * 0.2) * tree.z * speedMultiplier;
         if (tree.x < -80) tree.x = canvas.width + Math.random() * 150;
     });
 
-    // توليد حواجز النخيل
     obstacleTimer++;
     if (obstacleTimer > (100 + Math.random() * 60) / speedMultiplier) {
         palmObstacles.push({
@@ -239,28 +232,28 @@ function update() {
         obstacleTimer = 0;
     }
 
-    // ظهور الطيور بعد 5 نخلات
+    // الطيور
     if (passedObstaclesCount >= 5) {
         birdTimer++;
-        if (birdTimer > (180 + Math.random() * 100) / speedMultiplier) {
+        if (birdTimer > (150 + Math.random() * 80) / speedMultiplier) {
             birds.push({
                 x: canvas.width,
-                baseY: groundY - (90 + Math.random() * 80),
+                baseY: groundY - (80 + Math.random() * 80),
                 y: 0,
-                width: 35,
-                height: 25,
+                width: 40,
+                height: 30,
                 speed: (2.0 + Math.random() * 1.0) * speedMultiplier,
                 waveFreq: Math.random() * 0.05 + 0.02,
                 waveAmp: Math.random() * 30 + 15,
                 wingPos: 0,
-                isFalling: false, // حالة السقوط
+                isFalling: false,
                 fallSpeed: 0
             });
             birdTimer = 0;
         }
     }
 
-    // توليد عملات Pi
+    // عملات Pi
     coinTimer++;
     if (coinTimer > 40) {
         coins.push({
@@ -272,12 +265,14 @@ function update() {
         coinTimer = 0;
     }
 
-    // تحديث حواجز النخيل (النخيل هو الوحيد الذي ينهي اللعبة عند التصادم)
+    // تحديث النخيل (النخيل هو السبب الوحيد لإنهاء اللعبة Game Over)
     for (let i = palmObstacles.length - 1; i >= 0; i--) {
         let palm = palmObstacles[i];
         palm.x -= palm.speed + elephant.speedX * 0.4 * speedMultiplier;
 
-        if (checkCollision(elephant, palm)) gameOver = true;
+        if (checkRectCollision(elephant, palm)) {
+            gameOver = true;
+        }
 
         if (palm.x + palm.width < 0) {
             palmObstacles.splice(i, 1);
@@ -286,7 +281,7 @@ function update() {
         }
     }
 
-    // تحديث حركة الطيور وحسـاب إسقاطها
+    // تحديث الطيور وإصلاح فحص لمس الفيل للطائر
     for (let i = birds.length - 1; i >= 0; i--) {
         let bird = birds[i];
 
@@ -295,34 +290,33 @@ function update() {
             bird.y = bird.baseY + Math.sin(gameFrame * bird.waveFreq) * bird.waveAmp;
             bird.wingPos = Math.sin(gameFrame * 0.25) * 8;
 
-            // عند اصطدام الفيل بالطائر: يسقط الطائر وتكسب 5 Pi
-            if (checkCollision(elephant, bird)) {
+            // فحص التصادم المباشر بين الفيل والطائر
+            if (checkBirdCollision(elephant, bird)) {
                 bird.isFalling = true;
-                bird.fallSpeed = 4;
-                totalPiCoins += 5; // إضافة 5 عملات للمحفظة
+                bird.fallSpeed = 5;
+                totalPiCoins += 5; // إضافة 5 عملات Pi للمحفظة فوراً
                 currentSessionCoins += 5;
                 score += 50;
                 localStorage.setItem("total_pi_coins", totalPiCoins);
 
-                // فحص الفوز بمضاعفات الـ 100
                 if (totalPiCoins > 0 && totalPiCoins % 100 === 0) {
                     triggerWin();
                     return;
                 }
             }
         } else {
-            // انيميشن سقوط الطائر للأرض
+            // انيميشن سقوط الطائر عند لمسه
             bird.y += bird.fallSpeed;
-            bird.fallSpeed += 0.5; // جاذبية السقوط
+            bird.fallSpeed += 0.6;
             bird.x -= bird.speed;
 
             if (bird.y >= groundY) {
-                birds.splice(i, 1); // إزالة الطائر بعد السقوط للأرض
+                birds.splice(i, 1);
                 continue;
             }
         }
 
-        if (bird.x + bird.width < 0) birds.splice(i, 1);
+        if (bird.x + bird.width < -50) birds.splice(i, 1);
     }
 
     // جمع عملات Pi
@@ -356,12 +350,26 @@ function update() {
     }
 }
 
-function checkCollision(r1, r2) {
+// دالة فحص تصادم النخيل
+function checkRectCollision(r1, r2) {
     return (
-        r1.x < r2.x + r2.width - 8 &&
-        r1.x + r1.width - 8 > r2.x &&
+        r1.x < r2.x + r2.width - 5 &&
+        r1.x + r1.width - 5 > r2.x &&
         r1.y < r2.y + r2.height - 5 &&
         r1.y + r1.height > r2.y
+    );
+}
+
+// دالة فحص تصادم الطائر الدقيقة والمرنة
+function checkBirdCollision(el, bird) {
+    let birdCenterX = bird.x + bird.width / 2;
+    let birdCenterY = bird.y + bird.height / 2;
+
+    return (
+        birdCenterX >= el.x - 15 &&
+        birdCenterX <= el.x + el.width + 15 &&
+        birdCenterY >= el.y - 15 &&
+        birdCenterY <= el.y + el.height + 15
     );
 }
 
@@ -505,7 +513,6 @@ function drawBird(bird) {
     ctx.save();
     ctx.translate(bird.x, bird.y);
 
-    // إذا كان الطائر يسقط يميل رأساً على عقب
     if (bird.isFalling) {
         ctx.rotate(Math.PI / 2);
     }
