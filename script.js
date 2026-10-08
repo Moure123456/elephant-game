@@ -27,16 +27,16 @@ resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
 let score = 0;
-// استرجاع عملات Pi المحفوظة دائمًا وعدم تصفيرها عند الخسارة
+// استرجاع عملات Pi المحفوظة دائمًا
 let totalPiCoins = parseInt(localStorage.getItem("total_pi_coins")) || 0;
-let currentSessionCoins = 0; // العملات المجمعة في الجولة الحالية
+let currentSessionCoins = 0;
 
 let gameOver = false;
 let gameWon = false;
 let gameFrame = 0;
 let passedObstaclesCount = 0;
 
-// الألوان العشوائية للفيل
+// ألوان الفيل المتغيرة
 const ELEPHANT_COLORS = ["#95a5a6", "#3498db", "#e74c3c", "#9b59b6", "#1abc9c", "#f39c12", "#e67e22"];
 let currentElephantColor = ELEPHANT_COLORS[0];
 
@@ -84,7 +84,6 @@ let birdTimer = 0;
 const coins = [];
 let coinTimer = 0;
 
-// ألعاب نارية
 const fireworks = [];
 
 // بكرة التحكم
@@ -184,29 +183,6 @@ function triggerWin() {
     }
 }
 
-// تحويل العملات إلى محفظة Pi Network
-function transferToWallet() {
-    if (totalPiCoins < 100) {
-        alert("تعتمد عمليات التحويل على تجميع 100 عملة Pi أو مضاعفاتها!");
-        return;
-    }
-
-    let transferAmount = Math.floor(totalPiCoins / 100) * 100;
-    if (!piUserAddress) {
-        piUserAddress = prompt("أدخل عنوان محفظة Pi الخاصة بك (Public Key):", "G...");
-        if (piUserAddress) {
-            localStorage.setItem("pi_wallet_address", piUserAddress);
-        } else {
-            return;
-        }
-    }
-
-    alert(`جاري تحويل ${transferAmount} π إلى المحفظة:\n${piUserAddress}`);
-    totalPiCoins -= transferAmount;
-    localStorage.setItem("total_pi_coins", totalPiCoins);
-    alert("تمت عملية التحويل بنجاح وسُجلت في محفظتك!");
-}
-
 function update() {
     if (gameOver) return;
 
@@ -218,10 +194,10 @@ function update() {
     gameFrame++;
     const groundY = canvas.height - 70;
 
-    // السرعة: بطيئة أول 50 نخلة، ثم تعود للسرعة العادية
+    // السرعة: بطيئة أول 50 نخلة، ثم عادية
     let speedMultiplier = passedObstaclesCount < 50 ? 0.65 : 1.0;
 
-    // تغير لون الفيل عشوائياً أثناء السير
+    // تغير لون الفيل عشوائياً
     if (gameFrame % 40 === 0 && Math.abs(elephant.speedX) > 0.1) {
         currentElephantColor = ELEPHANT_COLORS[Math.floor(Math.random() * ELEPHANT_COLORS.length)];
     }
@@ -276,7 +252,9 @@ function update() {
                 speed: (2.0 + Math.random() * 1.0) * speedMultiplier,
                 waveFreq: Math.random() * 0.05 + 0.02,
                 waveAmp: Math.random() * 30 + 15,
-                wingPos: 0
+                wingPos: 0,
+                isFalling: false, // حالة السقوط
+                fallSpeed: 0
             });
             birdTimer = 0;
         }
@@ -294,7 +272,7 @@ function update() {
         coinTimer = 0;
     }
 
-    // تحديث حواجز النخيل
+    // تحديث حواجز النخيل (النخيل هو الوحيد الذي ينهي اللعبة عند التصادم)
     for (let i = palmObstacles.length - 1; i >= 0; i--) {
         let palm = palmObstacles[i];
         palm.x -= palm.speed + elephant.speedX * 0.4 * speedMultiplier;
@@ -308,18 +286,46 @@ function update() {
         }
     }
 
-    // تحديث الطيور
+    // تحديث حركة الطيور وحسـاب إسقاطها
     for (let i = birds.length - 1; i >= 0; i--) {
         let bird = birds[i];
-        bird.x -= bird.speed + elephant.speedX * 0.3 * speedMultiplier;
-        bird.y = bird.baseY + Math.sin(gameFrame * bird.waveFreq) * bird.waveAmp;
-        bird.wingPos = Math.sin(gameFrame * 0.25) * 8;
 
-        if (checkCollision(elephant, bird)) gameOver = true;
+        if (!bird.isFalling) {
+            bird.x -= bird.speed + elephant.speedX * 0.3 * speedMultiplier;
+            bird.y = bird.baseY + Math.sin(gameFrame * bird.waveFreq) * bird.waveAmp;
+            bird.wingPos = Math.sin(gameFrame * 0.25) * 8;
+
+            // عند اصطدام الفيل بالطائر: يسقط الطائر وتكسب 5 Pi
+            if (checkCollision(elephant, bird)) {
+                bird.isFalling = true;
+                bird.fallSpeed = 4;
+                totalPiCoins += 5; // إضافة 5 عملات للمحفظة
+                currentSessionCoins += 5;
+                score += 50;
+                localStorage.setItem("total_pi_coins", totalPiCoins);
+
+                // فحص الفوز بمضاعفات الـ 100
+                if (totalPiCoins > 0 && totalPiCoins % 100 === 0) {
+                    triggerWin();
+                    return;
+                }
+            }
+        } else {
+            // انيميشن سقوط الطائر للأرض
+            bird.y += bird.fallSpeed;
+            bird.fallSpeed += 0.5; // جاذبية السقوط
+            bird.x -= bird.speed;
+
+            if (bird.y >= groundY) {
+                birds.splice(i, 1); // إزالة الطائر بعد السقوط للأرض
+                continue;
+            }
+        }
+
         if (bird.x + bird.width < 0) birds.splice(i, 1);
     }
 
-    // جمع عملات Pi وحفظها بشكل دائم
+    // جمع عملات Pi
     for (let i = coins.length - 1; i >= 0; i--) {
         let coin = coins[i];
         coin.x -= coin.speed + elephant.speedX * 0.4 * speedMultiplier;
@@ -329,10 +335,9 @@ function update() {
             totalPiCoins++;
             currentSessionCoins++;
             score += 20;
-            localStorage.setItem("total_pi_coins", totalPiCoins); // حفظ دائم
+            localStorage.setItem("total_pi_coins", totalPiCoins);
             coins.splice(i, 1);
 
-            // عند الوصول لـ 100 عملة ومضاعفاتها
             if (totalPiCoins > 0 && totalPiCoins % 100 === 0) {
                 triggerWin();
                 return;
@@ -389,7 +394,6 @@ function draw() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // أشجار الخلفية
     bgTrees.forEach(tree => {
         ctx.fillStyle = `rgba(46, 204, 113, ${tree.z * 0.7})`;
         ctx.beginPath();
@@ -399,7 +403,6 @@ function draw() {
         ctx.fillRect(tree.x - 4 * tree.z, groundY - tree.height, 8 * tree.z, tree.height);
     });
 
-    // الأرضية
     ctx.fillStyle = "#27ae60";
     ctx.fillRect(0, groundY, canvas.width, 70);
     ctx.fillStyle = "#219150";
@@ -410,7 +413,6 @@ function draw() {
     birds.forEach(drawBird);
     coins.forEach(drawPiCoin);
 
-    // واجهة النتيجة والعملات المحفوظة
     ctx.fillStyle = currentTheme === "gold" ? "#000" : "#fff";
     ctx.font = "bold 17px Arial";
     ctx.textAlign = "left";
@@ -443,14 +445,13 @@ function drawWinState() {
 
     ctx.fillStyle = "#FFF";
     ctx.font = "bold 28px Arial";
-    ctx.fillText("مبروك! جمعت 100 عملة Pi!", canvas.width / 2, canvas.height / 2 + 30);
+    ctx.fillText("مبروك! وصل إجمالي محفظتك لـ 100 عملة Pi!", canvas.width / 2, canvas.height / 2 + 30);
     ctx.font = "18px Arial";
-    ctx.fillText(`إجمالي محفظتك الآن: ${totalPiCoins} π`, canvas.width / 2, canvas.height / 2 + 65);
+    ctx.fillText(`رصيدك الحالي: ${totalPiCoins} π`, canvas.width / 2, canvas.height / 2 + 65);
 
     requestAnimationFrame(update);
 }
 
-// رسم الفيل باللون المتردد المتغير
 function drawElephant(x, y) {
     ctx.save();
     ctx.translate(x, y);
@@ -459,7 +460,6 @@ function drawElephant(x, y) {
     ctx.fillRect(10 - elephant.legAngle/2, 35, 10, 16);
     ctx.fillRect(40 + elephant.legAngle/2, 35, 10, 16);
 
-    // لون جسم الفيل الديناميكي
     ctx.fillStyle = currentElephantColor;
     ctx.beginPath();
     ctx.arc(30, 22, 22, 0, Math.PI * 2);
@@ -504,6 +504,11 @@ function drawPalmTree(palm) {
 function drawBird(bird) {
     ctx.save();
     ctx.translate(bird.x, bird.y);
+
+    // إذا كان الطائر يسقط يميل رأساً على عقب
+    if (bird.isFalling) {
+        ctx.rotate(Math.PI / 2);
+    }
 
     ctx.fillStyle = "#e74c3c";
     ctx.beginPath();
