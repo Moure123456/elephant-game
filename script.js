@@ -20,14 +20,18 @@ window.addEventListener("resize", resizeCanvas);
 let score = 0;
 let piCoins = 0;
 let gameOver = false;
+let gameWon = false;
 let gameFrame = 0;
-let passedObstaclesCount = 0; // حساب الحواجز المتجاوزة
+let passedObstaclesCount = 0; // حساب النخلات المتجاوزة
 
-// مستويات القفز الثلاثة
+// ألعاب نارية/انفجار الألوان عند الفوز
+const fireworks = [];
+
+// مستويات القفز (القفزة الأولى أصبحت أقوى لتتخطى النخلة بسلاسة)
 const JUMP_LEVELS = [
-    { level: 1, power: -11 },
-    { level: 2, power: -14.5 },
-    { level: 3, power: -17.5 }
+    { level: 1, power: -14 },  // قفزة أطول وأسلس للنخلة
+    { level: 2, power: -16.5 },
+    { level: 3, power: -19 }
 ];
 let currentJumpLevel = 0;
 
@@ -45,7 +49,7 @@ const elephant = {
     legAngle: 0
 };
 
-// خلفيات اللعبة المتغيرة كل 10 حواجز
+// خلفيات اللعبة
 const BACKGROUND_THEMES = ["default", "black", "gold", "green"];
 
 // أشجار خلفية
@@ -58,11 +62,11 @@ for (let i = 0; i < 6; i++) {
     });
 }
 
-// حواجز شجر النخيل
+// حواجز النخيل
 const palmObstacles = [];
 let obstacleTimer = 0;
 
-// عصافير تسير ببطء
+// الطيور
 const birds = [];
 let birdTimer = 0;
 
@@ -76,36 +80,40 @@ const joystickKnob = document.getElementById("joystick-knob");
 let isDraggingJoystick = false;
 let joystickStartX = 0;
 
-joystickContainer.addEventListener("touchstart", (e) => {
-    isDraggingJoystick = true;
-    joystickStartX = e.touches[0].clientX;
-});
+if (joystickContainer && joystickKnob) {
+    joystickContainer.addEventListener("touchstart", (e) => {
+        isDraggingJoystick = true;
+        joystickStartX = e.touches[0].clientX;
+    });
 
-window.addEventListener("touchmove", (e) => {
-    if (!isDraggingJoystick) return;
-    const currentX = e.touches[0].clientX;
-    let diffX = currentX - joystickStartX;
-    diffX = Math.max(-30, Math.min(30, diffX));
+    window.addEventListener("touchmove", (e) => {
+        if (!isDraggingJoystick) return;
+        const currentX = e.touches[0].clientX;
+        let diffX = currentX - joystickStartX;
+        diffX = Math.max(-30, Math.min(30, diffX));
 
-    joystickKnob.style.transform = `translateX(${diffX}px)`;
-    elephant.speedX = (diffX / 30) * elephant.maxSpeed;
-});
+        joystickKnob.style.transform = `translateX(${diffX}px)`;
+        elephant.speedX = (diffX / 30) * elephant.maxSpeed;
+    });
 
-window.addEventListener("touchend", () => {
-    isDraggingJoystick = false;
-    joystickKnob.style.transform = `translateX(0px)`;
-    elephant.speedX = 0;
-});
+    window.addEventListener("touchend", () => {
+        isDraggingJoystick = false;
+        joystickKnob.style.transform = `translateX(0px)`;
+        elephant.speedX = 0;
+    });
+}
 
 // القفز
 const jumpBtn = document.getElementById("jump-btn");
-jumpBtn.addEventListener("touchstart", (e) => {
-    e.preventDefault();
-    performJump();
-});
+if (jumpBtn) {
+    jumpBtn.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        performJump();
+    });
+}
 
 function performJump() {
-    if (gameOver) {
+    if (gameOver || gameWon) {
         resetGame();
         return;
     }
@@ -135,6 +143,8 @@ function resetGame() {
     piCoins = 0;
     passedObstaclesCount = 0;
     gameOver = false;
+    gameWon = false;
+    fireworks.length = 0;
     palmObstacles.length = 0;
     birds.length = 0;
     coins.length = 0;
@@ -146,8 +156,29 @@ function resetGame() {
     requestAnimationFrame(update);
 }
 
+function triggerWin() {
+    gameWon = true;
+    // إنشاء ألعاب نارية وانفجارات ألوان
+    for (let i = 0; i < 120; i++) {
+        fireworks.push({
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            vx: (Math.random() - 0.5) * 16,
+            vy: (Math.random() - 0.5) * 16,
+            color: `hsl(${Math.random() * 360}, 100%, 60%)`,
+            radius: Math.random() * 6 + 3,
+            alpha: 1
+        });
+    }
+}
+
 function update() {
     if (gameOver) return;
+
+    if (gameWon) {
+        drawWinState();
+        return;
+    }
 
     gameFrame++;
     const groundY = canvas.height - 70;
@@ -181,35 +212,40 @@ function update() {
     if (obstacleTimer > 100 + Math.random() * 60) {
         palmObstacles.push({
             x: canvas.width,
-            y: groundY - 60,
-            width: 40,
-            height: 60,
-            speed: 3.5 + Math.random() * 1.5
+            y: groundY - 55,
+            width: 38,
+            height: 55,
+            speed: 3.5 + Math.random() * 1.2
         });
         obstacleTimer = 0;
     }
 
-    // توليد العصافير (سير بطيء)
-    birdTimer++;
-    if (birdTimer > 140 + Math.random() * 80) {
-        birds.push({
-            x: canvas.width,
-            y: groundY - (80 + Math.random() * 120),
-            width: 35,
-            height: 25,
-            speed: 2.2 + Math.random() * 1.2, // بطيئة
-            wingPos: 0
-        });
-        birdTimer = 0;
+    // الطيور: تظهر فقط بعد تخطي 5 نخلات وترتفع وتنخفض عشوائياً
+    if (passedObstaclesCount >= 5) {
+        birdTimer++;
+        if (birdTimer > 180 + Math.random() * 100) { // تقليل نسبة ظهورها
+            birds.push({
+                x: canvas.width,
+                baseY: groundY - (90 + Math.random() * 80),
+                y: 0,
+                width: 35,
+                height: 25,
+                speed: 2.0 + Math.random() * 1.0,
+                waveFreq: Math.random() * 0.05 + 0.02,
+                waveAmp: Math.random() * 30 + 15,
+                wingPos: 0
+            });
+            birdTimer = 0;
+        }
     }
 
-    // توليد عملات Pi بكثرة لسهولة الجمع
+    // توليد عملات Pi
     coinTimer++;
-    if (coinTimer > 45) {
+    if (coinTimer > 40) {
         coins.push({
             x: canvas.width,
             y: groundY - (35 + Math.random() * 130),
-            radius: 18, // حجم أكبر
+            radius: 18,
             speed: 3.5
         });
         coinTimer = 0;
@@ -225,30 +261,38 @@ function update() {
         if (palm.x + palm.width < 0) {
             palmObstacles.splice(i, 1);
             score += 10;
-            passedObstaclesCount++; // زيادة عدد الحواجز لتغيير اللون
+            passedObstaclesCount++;
         }
     }
 
-    // تحديث العصافير
+    // تحديث حركة الطيور المنخفضة والمرتفعة عشوائياً
     for (let i = birds.length - 1; i >= 0; i--) {
         let bird = birds[i];
         bird.x -= bird.speed + elephant.speedX * 0.3;
-        bird.wingPos = Math.sin(gameFrame * 0.25) * 8; // رفرفة الجناحين
+        // ارتفاء وانخفاض عشوائي تموجي
+        bird.y = bird.baseY + Math.sin(gameFrame * bird.waveFreq) * bird.waveAmp;
+        bird.wingPos = Math.sin(gameFrame * 0.25) * 8;
 
         if (checkCollision(elephant, bird)) gameOver = true;
         if (bird.x + bird.width < 0) birds.splice(i, 1);
     }
 
-    // جمع عملات Pi مع مجال التقاط واسع وسهل
+    // جمع عملات Pi وفحص الفوز بـ 100 عملة
     for (let i = coins.length - 1; i >= 0; i--) {
         let coin = coins[i];
         coin.x -= coin.speed + elephant.speedX * 0.4;
 
         let dist = Math.hypot((elephant.x + elephant.width/2) - coin.x, (elephant.y + elephant.height/2) - coin.y);
-        if (dist < coin.radius + 45) { // زيادة نطاق التقاط العملة بسهولة
+        if (dist < coin.radius + 45) {
             piCoins++;
             score += 20;
             coins.splice(i, 1);
+
+            // الشرط: الوصول لـ 100 عملة Pi للفوز
+            if (piCoins >= 100) {
+                triggerWin();
+                return;
+            }
         } else if (coin.x < -30) {
             coins.splice(i, 1);
         }
@@ -275,7 +319,6 @@ function checkCollision(r1, r2) {
 function draw() {
     const groundY = canvas.height - 70;
 
-    // تحديد لون الخلفية بناءً على كل 10 حواجز
     let themeIndex = Math.floor(passedObstaclesCount / 10) % BACKGROUND_THEMES.length;
     let currentTheme = BACKGROUND_THEMES[themeIndex];
 
@@ -295,7 +338,6 @@ function draw() {
         ctx.fillStyle = greenGrad;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     } else {
-        // السماء الافتراضية
         let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
         skyGrad.addColorStop(0, "#2980b9");
         skyGrad.addColorStop(1, "#6dd5fa");
@@ -319,28 +361,60 @@ function draw() {
     ctx.fillStyle = "#219150";
     ctx.fillRect(0, groundY, canvas.width, 8);
 
-    // الفيل
+    // العناصر
     drawElephant(elephant.x, elephant.y);
-
-    // رسم شجر النخيل (الحواجز)
     palmObstacles.forEach(drawPalmTree);
-
-    // رسم العصافير
     birds.forEach(drawBird);
-
-    // رسم عملات Pi
     coins.forEach(drawPiCoin);
 
-    // معلومات اللعبة
+    // الواجهة
     ctx.fillStyle = currentTheme === "gold" ? "#000" : "#fff";
     ctx.font = "bold 18px Arial";
     ctx.textAlign = "left";
     ctx.fillText(`النقاط: ${score}`, 15, 30);
-    ctx.fillText(`عملات Pi: ${piCoins} π`, 15, 58);
+    ctx.fillText(`عملات Pi: ${piCoins} / 100 π`, 15, 58);
     ctx.fillText(`مستوى القفز: ${currentJumpLevel + 1}/3`, 15, 86);
 }
 
-// رسم الفيل
+// شاشة احتفال الفوز بالكأس وانفجار الألوان
+function drawWinState() {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // تحديث ورسم انبعاثات الألوان المتداخلة
+    fireworks.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.alpha -= 0.008;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    });
+
+    // الكأس
+    ctx.fillStyle = "#f1c40f";
+    ctx.font = "90px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("🏆", canvas.width / 2, canvas.height / 2 - 30);
+
+    ctx.fillStyle = "#FFF";
+    ctx.font = "bold 32px Arial";
+    ctx.fillText("مبروك! لقد فزت بالكأس!", canvas.width / 2, canvas.height / 2 + 50);
+    ctx.font = "20px Arial";
+    ctx.fillText("تم جمع 100 عملة Pi بنجاح!", canvas.width / 2, canvas.height / 2 + 85);
+    ctx.fillText("إلمس الشاشة للإعادة", canvas.width / 2, canvas.height / 2 + 125);
+
+    if (fireworks.length < 200 && Math.random() < 0.3) {
+        triggerWin();
+    }
+
+    requestAnimationFrame(update);
+}
+
 function drawElephant(x, y) {
     ctx.save();
     ctx.translate(x, y);
@@ -373,16 +447,13 @@ function drawElephant(x, y) {
     ctx.restore();
 }
 
-// رسم حاجز النخيل
 function drawPalmTree(palm) {
     ctx.save();
     ctx.translate(palm.x, palm.y);
 
-    // جذع النخلة
     ctx.fillStyle = "#795548";
     ctx.fillRect(palm.width / 2 - 5, 15, 10, palm.height - 15);
 
-    // أوراق النخلة
     ctx.fillStyle = "#1b5e20";
     for (let i = 0; i < 5; i++) {
         ctx.beginPath();
@@ -393,18 +464,15 @@ function drawPalmTree(palm) {
     ctx.restore();
 }
 
-// رسم العصفور المرفرف
 function drawBird(bird) {
     ctx.save();
     ctx.translate(bird.x, bird.y);
 
-    // جسم العصفور
     ctx.fillStyle = "#e74c3c";
     ctx.beginPath();
     ctx.ellipse(15, 12, 12, 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // المنقار
     ctx.fillStyle = "#f39c12";
     ctx.beginPath();
     ctx.moveTo(0, 12);
@@ -412,7 +480,6 @@ function drawBird(bird) {
     ctx.lineTo(-8, 15);
     ctx.fill();
 
-    // العين
     ctx.fillStyle = "#fff";
     ctx.beginPath();
     ctx.arc(6, 9, 3, 0, Math.PI * 2);
@@ -422,7 +489,6 @@ function drawBird(bird) {
     ctx.arc(5, 9, 1.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // الأجنحة المرفرفة
     ctx.fillStyle = "#c0392b";
     ctx.beginPath();
     ctx.ellipse(16, 12, 8, 4, bird.wingPos * 0.1, 0, Math.PI * 2);
@@ -431,7 +497,6 @@ function drawBird(bird) {
     ctx.restore();
 }
 
-// رسم عملة Pi
 function drawPiCoin(coin) {
     ctx.save();
     ctx.fillStyle = "#f39c12";
@@ -460,7 +525,7 @@ function showGameOver() {
     ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2 - 20);
     ctx.font = "18px Arial";
     ctx.fillText(`مجموع نقاطك: ${score} | عملات Pi: ${piCoins} π`, canvas.width / 2, canvas.height / 2 + 20);
-    ctx.fillText("إلمس زر القفز للعب مجدداً", canvas.width / 2, canvas.height / 2 + 60);
+    ctx.fillText("إلمس الشاشة لإعادة اللعب", canvas.width / 2, canvas.height / 2 + 60);
 }
 
 resetGame();
