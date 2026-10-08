@@ -3,14 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Elephant Pi Game</title>
+    <title>Elephant Pi Adventure 3D</title>
+    
+    <!-- مكتبة Pi SDK الرسمية -->
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    <script>
+        // تهيئة وتأكيد التوثيق الخاص بـ App Studio (Pi Auth)
+        window.onload = function() {
+            if (window.Pi) {
+                try {
+                    window.Pi.init({ version: "2.0", sandbox: true });
+                    // دالة التوثيق التي تفحصها App Studio
+                    window.Pi.authenticate(['username', 'payments', 'wallet_address'], onIncompletePaymentFound)
+                    .then(function(auth) {
+                        console.log("Pi App Verified Successfully:", auth);
+                    }).catch(function(error) {
+                        console.error("Pi Auth Error:", error);
+                    });
+                } catch(e) {
+                    console.log("Pi SDK Init Error:", e);
+                }
+            }
+        };
+
+        function onIncompletePaymentFound(payment) {
+            console.log("Incomplete payment found:", payment);
+        };
+    </script>
+
     <style>
         * {
             box-sizing: border-box;
-            margin: 0;
-            padding: 0;
             user-select: none;
             -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
         }
         body, html {
             width: 100%;
@@ -19,6 +46,7 @@
             background-color: #111;
             font-family: Arial, sans-serif;
         }
+
         #game-container {
             position: relative;
             width: 100vw;
@@ -27,12 +55,14 @@
             justify-content: center;
             align-items: center;
         }
+
         canvas {
             width: 100%;
             height: 100%;
             display: block;
             background: #000;
         }
+
         #jump-btn {
             position: absolute;
             left: 20px;
@@ -48,24 +78,54 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 10;
-            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
             touch-action: manipulation;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            z-index: 10;
         }
+
         #jump-btn:active {
-            transform: scale(0.95);
-            background: rgba(230, 100, 0, 0.95);
+            background: rgba(255, 69, 0, 1);
+            transform: scale(0.92);
+        }
+
+        #joystick-container {
+            position: absolute;
+            right: 25px;
+            bottom: 25px;
+            width: 110px;
+            height: 110px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        #joystick-knob {
+            position: absolute;
+            top: 32px;
+            left: 32px;
+            width: 46px;
+            height: 46px;
+            background: #8e44ad;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         }
     </style>
 </head>
 <body>
+
     <div id="game-container">
         <canvas id="gameCanvas"></canvas>
+
         <div id="jump-btn">قفز ⬆️</div>
+
+        <div id="joystick-container">
+            <div id="joystick-knob"></div>
+        </div>
     </div>
 
-    <!-- استدعاء ملف البرمجة script.js -->
     <script src="script.js"></script>
 </body>
 </html>
