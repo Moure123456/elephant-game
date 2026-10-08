@@ -1,0 +1,7 @@
+{
+  "name": "Elephant Pi Game",
+  "description": "An interactive 3D runner game with Pi wallet integration.",
+  "app_url": "https://moure123456.github.io/elephant-game/",
+  "version": "1.0.0",
+  "pi_sdk_version": "2.0"
+}
