@@ -1,299 +1,209 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>لعبة الفيل القافز</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-user-select: none;
+// ==========================================
+// 1. إعداد شاشة اللعبة
+// ==========================================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// دالة آمنة لتشغيل الأصوات داخل المتصفحات
+function playSound(url) {
+    try {
+        const audio = new Audio(url);
+        audio.volume = 0.5;
+        audio.play().catch(e => console.log("Audio play deferred:", e));
+    } catch(e) {
+        console.log("Audio error:", e);
+    }
+}
+
+// ==========================================
+// 2. حالة اللعبة واللاعب (Elephant)
+// ==========================================
+let piScore = 0;
+let gameOver = false;
+let frameCount = 0;
+
+const elephant = {
+    x: 60,
+    y: canvas.height - 160,
+    width: 65,
+    height: 55,
+    velocityY: 0,
+    gravity: 0.8,
+    jumpPower: -14,
+    isGrounded: false
+};
+
+// ==========================================
+// 3. البيئة والعوائق
+// ==========================================
+let palmTrees = [];
+let obstacles = [];
+let piCoins = [];
+
+for (let i = 0; i < 4; i++) {
+    palmTrees.push({
+        x: i * 220 + Math.random() * 40,
+        speed: 1.5
+    });
+}
+
+function spawnObstacle() {
+    obstacles.push({
+        x: canvas.width,
+        y: canvas.height - 110,
+        width: 35,
+        height: 50,
+        speed: 5
+    });
+}
+
+function spawnPiCoin() {
+    piCoins.push({
+        x: canvas.width,
+        y: canvas.height - 170 - Math.random() * 70,
+        radius: 16,
+        speed: 5
+    });
+}
+
+// ==========================================
+// 4. عناصر التحكم
+// ==========================================
+const jumpBtn = document.getElementById('jump-btn');
+
+function triggerJump() {
+    if (elephant.isGrounded && !gameOver) {
+        elephant.velocityY = elephant.jumpPower;
+        elephant.isGrounded = false;
+        playSound('https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg');
+    } else if (gameOver) {
+        restartGame();
+    }
+}
+
+if (jumpBtn) {
+    jumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); triggerJump(); });
+    jumpBtn.addEventListener('click', triggerJump);
+}
+
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.code === 'ArrowUp') {
+        triggerJump();
+    }
+});
+
+// ==========================================
+// 5. دوال الرسم (Canvas Rendering)
+// ==========================================
+function drawPalmTree(x) {
+    const groundY = canvas.height - 60;
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(x + 15, groundY - 110, 14, 110);
+    
+    ctx.fillStyle = '#2E8B57';
+    ctx.beginPath();
+    ctx.arc(x + 22, groundY - 110, 40, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#D22B2B';
+    ctx.beginPath();
+    ctx.arc(x + 12, groundY - 100, 5, 0, Math.PI * 2);
+    ctx.arc(x + 32, groundY - 100, 5, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function drawElephant(x, y, w, h) {
+    // الجسم
+    ctx.fillStyle = '#708090';
+    ctx.fillRect(x, y, w, h);
+
+    // الأذن
+    ctx.fillStyle = '#A9A9A9';
+    ctx.beginPath();
+    ctx.arc(x + 12, y + 20, 14, 0, Math.PI * 2);
+    ctx.fill();
+
+    // العين
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(x + w - 18, y + 12, 6, 6);
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(x + w - 16, y + 14, 3, 3);
+
+    // الخرطوم
+    ctx.fillStyle = '#708090';
+    ctx.fillRect(x + w, y + 22, 12, 20);
+    ctx.fillRect(x + w + 6, y + 36, 10, 6);
+}
+
+function drawPiCoin(coin) {
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#7B1FA2';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('π', coin.x, coin.y + 1);
+}
+
+// ==========================================
+// 6. دالة التحديث والتشغيل
+// ==========================================
+function update() {
+    if (gameOver) return;
+
+    frameCount++;
+
+    palmTrees.forEach(tree => {
+        tree.x -= tree.speed;
+        if (tree.x < -80) tree.x = canvas.width + Math.random() * 40;
+    });
+
+    elephant.velocityY += elephant.gravity;
+    elephant.y += elephant.velocityY;
+
+    const groundLevel = canvas.height - 60 - elephant.height;
+    if (elephant.y >= groundLevel) {
+        elephant.y = groundLevel;
+        elephant.velocityY = 0;
+        elephant.isGrounded = true;
+    }
+
+    if (frameCount % 120 === 0) spawnObstacle();
+    if (frameCount % 80 === 0) spawnPiCoin();
+
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        obstacles[i].x -= obstacles[i].speed;
+
+        if (
+            elephant.x < obstacles[i].x + obstacles[i].width &&
+            elephant.x + elephant.width > obstacles[i].x &&
+            elephant.y < obstacles[i].y + obstacles[i].height &&
+            elephant.y + elephant.height > obstacles[i].y
+        ) {
+            gameOver = true;
+            playSound('https://actions.google.com/sounds/v1/cartoon/clime_up_and_fall.ogg');
         }
 
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #2c3e50;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: white;
-            overflow: hidden;
+        if (obstacles[i].x + obstacles[i].width < 0) {
+            obstacles.splice(i, 1);
         }
+    }
 
-        h1 {
-            margin: 5px 0;
-            font-size: 20px;
-        }
+    for (let i = piCoins.length - 1; i >= 0; i--) {
+        piCoins[i].x -= piCoins[i].speed;
 
-        #gameCanvas {
-            border: 3px solid #fff;
-            border-radius: 8px;
-            background-color: #87CEEB;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-            max-width: 95vw;
-            max-height: 60vh;
-            touch-action: manipulation;
-        }
+        let distX = (elephant.x + elephant.width / 2) - piCoins[i].x;
+        let distY = (elephant.y + elephant.height / 2) - piCoins[i].y;
+        let distance = Math.sqrt(distX * distX + distY * distY);
 
-        .controls {
-            margin-top: 15px;
-            display: flex;
-            gap: 15px;
-        }
-
-        .btn {
-            background-color: #e67e22;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            font-size: 18px;
-            font-weight: bold;
-            border-radius: 30px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            cursor: pointer;
-            touch-action: manipulation;
-        }
-
-        .btn:active {
-            transform: scale(0.95);
-            background-color: #d35400;
-        }
-    </style>
-</head>
-<body>
-
-    <h1>🐘 لعبة الفيل القافز</h1>
-    <canvas id="gameCanvas" width="800" height="400"></canvas>
-
-    <div class="controls">
-        <button class="btn" id="jumpBtn">⬆️ قفز</button>
-        <button class="btn" id="restartBtn" style="background-color: #27ae60;">🔄 إعادة</button>
-    </div>
-
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const jumpBtn = document.getElementById('jumpBtn');
-        const restartBtn = document.getElementById('restartBtn');
-
-        // نظام الصوت (Web Audio API)
-        let audioCtx = null;
-
-        function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-        }
-
-        function playJumpSound() {
-            if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.15);
-            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.15);
-        }
-
-        function playGameOverSound() {
-            if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.5);
-            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.5);
-        }
-
-        // حالة اللعبة
-        let score = 0;
-        let gameOver = false;
-        let frameCount = 0;
-
-        const elephant = {
-            x: 80,
-            y: 280,
-            width: 50,
-            height: 50,
-            velocityY: 0,
-            gravity: 0.6,
-            jumpPower: -12,
-            isGrounded: true,
-            draw() {
-                ctx.fillStyle = '#7f8c8d';
-                ctx.beginPath();
-                ctx.roundRect(this.x, this.y, this.width, this.height, 10);
-                ctx.fill();
-
-                ctx.fillStyle = '#95a5a6';
-                ctx.beginPath();
-                ctx.ellipse(this.x + 10, this.y + 20, 10, 15, 0, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = '#000';
-                ctx.beginPath();
-                ctx.arc(this.x + 38, this.y + 15, 4, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.strokeStyle = '#7f8c8d';
-                ctx.lineWidth = 6;
-                ctx.beginPath();
-                ctx.moveTo(this.x + 45, this.y + 30);
-                ctx.quadraticCurveTo(this.x + 60, this.y + 35, this.x + 55, this.y + 45);
-                ctx.stroke();
-            },
-            jump() {
-                if (this.isGrounded && !gameOver) {
-                    this.velocityY = this.jumpPower;
-                    this.isGrounded = false;
-                    playJumpSound();
-                }
-            },
-            update() {
-                this.velocityY += this.gravity;
-                this.y += this.velocityY;
-
-                if (this.y >= 280) {
-                    this.y = 280;
-                    this.velocityY = 0;
-                    this.isGrounded = true;
-                }
-            }
-        };
-
-        const obstacles = [];
-        const obstacleWidth = 30;
-
-        function spawnObstacle() {
-            const height = Math.floor(Math.random() * 40) + 40; 
-            obstacles.push({
-                x: canvas.width,
-                y: 330 - height,
-                width: obstacleWidth,
-                height: height
-            });
-        }
-
-        function drawEnvironment() {
-            ctx.fillStyle = '#27ae60';
-            ctx.fillRect(0, 330, canvas.width, 70);
-
-            ctx.fillStyle = '#219150';
-            ctx.fillRect(0, 345, canvas.width, 55);
-        }
-
-        function checkCollision(rect1, rect2) {
-            return (
-                rect1.x < rect2.x + rect2.width &&
-                rect1.x + rect1.width > rect2.x &&
-                rect1.y < rect2.y + rect2.height &&
-                rect1.y + rect1.height > rect2.y
-            );
-        }
-
-        function resetGame() {
-            score = 0;
-            obstacles.length = 0;
-            elephant.y = 280;
-            elephant.velocityY = 0;
-            gameOver = false;
-            loop();
-        }
-
-        function handleJump(e) {
-            if (e) e.preventDefault();
-            initAudio();
-            if (gameOver) {
-                resetGame();
-            } else {
-                elephant.jump();
-            }
-        }
-
-        function loop() {
-            if (gameOver) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold 32px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('انتهت اللعبة!', canvas.width / 2, canvas.height / 2 - 20);
-                ctx.font = '20px Arial';
-                ctx.fillText(`النقاط: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
-                ctx.fillText('اضغط إعادة للعب مجددًا', canvas.width / 2, canvas.height / 2 + 60);
-                return;
-            }
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            drawEnvironment();
-            elephant.update();
-            elephant.draw();
-
-            frameCount++;
-            if (frameCount % 110 === 0) {
-                spawnObstacle();
-            }
-
-            for (let i = obstacles.length - 1; i >= 0; i--) {
-                const obs = obstacles[i];
-                obs.x -= 6;
-
-                ctx.fillStyle = '#e67e22';
-                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-                ctx.strokeStyle = '#d35400';
-                ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
-
-                if (checkCollision(elephant, obs)) {
-                    gameOver = true;
-                    playGameOverSound();
-                }
-
-                if (obs.x + obs.width < 0) {
-                    obstacles.splice(i, 1);
-                    score += 10;
-                }
-            }
-
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 22px Arial';
-            ctx.textAlign = 'left';
-            ctx.fillText(`النقاط: ${score}`, 20, 35);
-
-            requestAnimationFrame(loop);
-        }
-
-        // دعم أحداث اللمس والماوس ولوحة المفاتيح
-        canvas.addEventListener('touchstart', handleJump);
-        canvas.addEventListener('mousedown', handleJump);
-        jumpBtn.addEventListener('touchstart', handleJump);
-        jumpBtn.addEventListener('click', handleJump);
-
-        restartBtn.addEventListener('click', () => { initAudio(); resetGame(); });
-        restartBtn.addEventListener('touchstart', (e) => { e.preventDefault(); initAudio(); resetGame(); });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') handleJump(e);
-            if (e.code === 'KeyR' && gameOver) resetGame();
-        });
-
-        loop();
-    </script>
-</body>
-</html>
+        if (distance < elephant.width
